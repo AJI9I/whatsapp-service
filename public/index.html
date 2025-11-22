@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Service - Управление</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px 0;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+        }
+        .chat-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .chat-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .chat-item:hover {
+            background-color: #f0f0f0;
+        }
+        .chat-item.selected {
+            background-color: #d4edda;
+        }
+        .qrcode-container {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+        .qrcode-container img {
+            max-width: 300px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1055;
+        }
+        .logs-container {
+            height: 400px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            padding: 15px;
+            border-radius: 0 0 8px 8px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+            border-bottom: 1px solid #2d2d2d;
+        }
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        .log-timestamp {
+            color: #858585;
+            margin-right: 10px;
+        }
+        .log-level-info {
+            color: #4ec9b0;
+        }
+        .log-level-warn {
+            color: #dcdcaa;
+        }
+        .log-level-error {
+            color: #f48771;
+        }
+        .log-level-debug {
+            color: #569cd6;
+        }
+        .log-message {
+            color: #d4d4d4;
+            word-wrap: break-word;
+        }
+        .log-data {
+            color: #ce9178;
+            margin-left: 20px;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="mb-0">
+                    <i class="bi bi-whatsapp text-success"></i> WhatsApp Service
+                </h1>
+                <p class="text-muted">Управление мониторингом сообщений</p>
+            </div>
+        </div>
+
+        <!-- Статус подключения -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Статус</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-warning me-2" onclick="reconnectClient()">
+                                <i class="bi bi-arrow-repeat"></i> Переподключить
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshStatus()">
+                                <i class="bi bi-arrow-clockwise"></i> Обновить
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <strong>Статус подключения:</strong>
+                                <span id="connectionStatus" class="badge status-badge ms-2">
+                                    <span class="loading"></span> Загрузка...
+                                </span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong>Клиент:</strong>
+                                <span id="clientInfo" class="ms-2 text-muted">-</span>
+                            </div>
+                        </div>
+                        <div id="qrcodeContainer" class="qrcode-container" style="display: none;">
+                            <p class="mb-3"><strong>Отсканируйте QR-код для подключения:</strong></p>
+                            <img id="qrcodeImage" src="" alt="QR Code">
+                            <p class="text-muted mt-3 small">
+                                Откройте WhatsApp → Настройки → Связанные устройства → Привязать устройство
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Информация о модели Ollama -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-cpu"></i> Информация о модели Ollama</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshModelInfo()">
+                            <i class="bi bi-arrow-clockwise"></i> Обновить
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="modelInfoContainer">
+                            <div class="text-center py-3">
+                                <span class="loading"></span>
+                                <span class="ms-2">Загрузка информации о модели...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Настройки API -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-gear"></i> Настройки API</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="apiConfigForm">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="apiUrl" class="form-label">API URL</label>
+                                    <input type="text" class="form-control" id="apiUrl" 
+                                           placeholder="http://localhost:8080" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="apiEndpoint" class="form-label">API Endpoint</label>
+                                    <input type="text" class="form-control" id="apiEndpoint" 
+                                           placeholder="/api/webhook/whatsapp" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="apiKey" class="form-label">API Key (опционально)</label>
+                                <input type="text" class="form-control" id="apiKey" 
+                                       placeholder="your-api-key">
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Сохранить
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Группы для мониторинга -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-people"></i> Группы</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="refreshChats()">
+                                <i class="bi bi-arrow-clockwise"></i> Обновить
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="monitorAllGroups">
+                            <label class="form-check-label" for="monitorAllGroups">
+                                Мониторить все группы
+                            </label>
+                        </div>
+                        <div class="chat-list" id="groupsList">
+                            <div class="text-center text-muted">
+                                <div class="loading"></div> Загрузка групп...
+                            </div>
+                        </div>
+                        <button class="btn btn-success mt-3 w-100" onclick="saveGroupsConfig()">
+                            <i class="bi bi-save"></i> Сохранить выбор
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Личные чаты для мониторинга -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-person"></i> Личные чаты</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="refreshChats()">
+                                <i class="bi bi-arrow-clockwise"></i> Обновить
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="monitorAllPersonal">
+                            <label class="form-check-label" for="monitorAllPersonal">
+                                Мониторить все личные чаты
+                            </label>
+                        </div>
+                        <div class="chat-list" id="personalChatsList">
+                            <div class="text-center text-muted">
+                                <div class="loading"></div> Загрузка чатов...
+                            </div>
+                        </div>
+                        <button class="btn btn-success mt-3 w-100" onclick="savePersonalConfig()">
+                            <i class="bi bi-save"></i> Сохранить выбор
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Тестовое сообщение -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning bg-opacity-10">
+                        <h5 class="mb-0"><i class="bi bi-send"></i> Тестовое сообщение</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Отправьте тестовое сообщение для проверки обработки. Сообщение будет обработано как будто оно пришло из группы WhatsApp.
+                        </p>
+                        <form id="testMessageForm">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="testChatName" class="form-label">Название чата</label>
+                                    <input type="text" class="form-control" id="testChatName" 
+                                           placeholder="Test Group" value="Test Group">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="testSenderName" class="form-label">Имя отправителя</label>
+                                    <input type="text" class="form-control" id="testSenderName" 
+                                           placeholder="Test User" value="Test User">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="testSenderPhone" class="form-label">Телефон отправителя</label>
+                                    <input type="text" class="form-control" id="testSenderPhone" 
+                                           placeholder="79999999999" value="79999999999">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Тип чата</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="testIsGroup" 
+                                               id="testIsGroup" value="true" checked>
+                                        <label class="form-check-label" for="testIsGroup">
+                                            Группа
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="testIsGroup" 
+                                               id="testIsPersonal" value="false">
+                                        <label class="form-check-label" for="testIsPersonal">
+                                            Личный чат
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="testMessageContent" class="form-label">Текст сообщения</label>
+                                <textarea class="form-control" id="testMessageContent" rows="5" 
+                                          placeholder="Введите текст сообщения, например:&#10;Продам Москва Б/У:&#10;1)S19j PRO 104T, 1шт. 270u;&#10;2)S19j XP 143T, 43шт. по 900u;" required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-send"></i> Отправить тестовое сообщение
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Логи приложения -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-terminal"></i> Логи приложения</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-danger me-2" onclick="clearLogs()">
+                                <i class="bi bi-trash"></i> Очистить
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshLogs()">
+                                <i class="bi bi-arrow-clockwise"></i> Обновить
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="logsContainer" class="logs-container">
+                            <div class="text-center text-muted p-3">
+                                <div class="loading"></div> Загрузка логов...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast контейнер для уведомлений -->
+    <div class="toast-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
