@@ -411,6 +411,45 @@ export async function handleMessage(message) {
       }
     }
     
+    // Дополнительный метод получения номера телефона через чат автора
+    // Используем тот же метод, что работает в API тестах
+    // Этот метод более надежный, поэтому используем его для обновления номера
+    try {
+      // Определяем chatId автора сообщения
+      // Если есть message.id.participant (групповое сообщение), используем message.author
+      // Иначе используем message.from (личное сообщение)
+      let authorChatId;
+      if (message.id?.participant) {
+        authorChatId = message.author || message.from;
+      } else {
+        authorChatId = message.from;
+      }
+      
+      if (authorChatId) {
+        // Получаем чат по ID автора
+        const authorChat = await client.getChatById(authorChatId);
+        
+        // Извлекаем номер телефона из chat.id.user
+        const authorPhone = authorChat?.id?.user || null;
+        
+        if (authorPhone && authorPhone.length <= 15 && !authorPhone.includes('@')) {
+          const newPhoneNumber = formatPhoneNumber(authorPhone);
+          if (newPhoneNumber && newPhoneNumber !== 'unknown') {
+            // Обновляем номер телефона, если получен новый
+            if (senderPhoneNumber !== newPhoneNumber) {
+              logger.info(`📞 Номер обновлен через метод чата автора: ${senderPhoneNumber} → ${newPhoneNumber}`);
+            } else {
+              logger.debug(`📞 Номер подтвержден через метод чата автора: ${newPhoneNumber}`);
+            }
+            senderPhoneNumber = newPhoneNumber;
+          }
+        }
+      }
+    } catch (authorChatError) {
+      logger.debug(`⚠️  Не удалось получить/обновить номер через чат автора: ${authorChatError.message}`);
+      // Не критично, продолжаем с текущим значением
+    }
+    
     // Если номер все еще не найден, используем 'unknown'
     if (!senderPhoneNumber) {
       senderPhoneNumber = 'unknown';
