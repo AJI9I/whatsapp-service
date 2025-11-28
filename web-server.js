@@ -2253,6 +2253,11 @@ app.post('/api/webhook/ollama-result', async (req, res) => {
         
         logger.info(`   Всего товаров для обработки: ${productsToProcess.length}`);
         
+        // Счетчики для отслеживания успешных отправок
+        let totalSent = 0;
+        let totalFailed = 0;
+        const sendResults = [];
+        
         // Обрабатываем каждый товар
         if (productsToProcess.length > 0) {
           for (let i = 0; i < productsToProcess.length; i++) {
@@ -2334,16 +2339,78 @@ app.post('/api/webhook/ollama-result', async (req, res) => {
               });
               
               const successCount = results.filter(r => r.success).length;
+              const failedCount = results.filter(r => !r.success).length;
+              
               logger.info(`   ✅ Товар ${i + 1} отправлен: ${successCount}/${apiTargets.length} API успешно`);
+              
+              // Сохраняем результаты для итогового обновления статуса
+              sendResults.push({
+                productIndex: i + 1,
+                success: successCount > 0, // Успешно, если хотя бы один API принял
+                successCount: successCount,
+                failedCount: failedCount,
+                results: results
+              });
+              
+              if (successCount > 0) {
+                totalSent++;
+              } else {
+                totalFailed++;
+              }
             } catch (apiError) {
               logger.error(`   ❌ Ошибка отправки товара ${i + 1} в Spring Boot: ${apiError.message}`);
               if (apiError.stack) {
                 logger.error(`   Стек ошибки: ${apiError.stack.substring(0, 500)}`);
               }
+              
+              sendResults.push({
+                productIndex: i + 1,
+                success: false,
+                error: apiError.message
+              });
+              totalFailed++;
             }
+          }
+          
+          // Обновляем статус сообщения после обработки всех товаров
+          logger.info('═'.repeat(80));
+          logger.info('📊 ИТОГОВАЯ СТАТИСТИКА ОТПРАВКИ В SPRING BOOT:');
+          logger.info('═'.repeat(80));
+          logger.info(`   Всего товаров: ${productsToProcess.length}`);
+          logger.info(`   Успешно отправлено: ${totalSent}`);
+          logger.info(`   Ошибок отправки: ${totalFailed}`);
+          logger.info('═'.repeat(80));
+          
+          try {
+            // Обновляем статус сообщения
+            // Если хотя бы один товар успешно отправлен, статус = 'processed'
+            // Если все товары не отправлены, статус = 'failed'
+            const finalStatus = totalSent > 0 ? 'processed' : 'failed';
+            
+            // Получаем ID сообщения из БД для обновления
+            const messageFromDb = await messageRepository.getMessageByWhatsAppId(whatsapp_message_id);
+            if (messageFromDb) {
+              await messageRepository.updateStatus(messageFromDb.id, finalStatus);
+              logger.info(`✅ Статус сообщения #${messageFromDb.id} обновлен на '${finalStatus}'`);
+            } else {
+              logger.warn(`⚠️  Сообщение не найдено в БД для обновления статуса: ${whatsapp_message_id}`);
+            }
+          } catch (statusError) {
+            logger.error(`❌ Ошибка обновления статуса сообщения: ${statusError.message}`);
           }
         } else {
           logger.info(`   ℹ️  Нет товаров для отправки в Spring Boot`);
+          
+          // Если нет товаров, но парсинг успешен, обновляем статус
+          try {
+            const messageFromDb = await messageRepository.getMessageByWhatsAppId(whatsapp_message_id);
+            if (messageFromDb) {
+              await messageRepository.updateStatus(messageFromDb.id, 'processed');
+              logger.info(`✅ Статус сообщения #${messageFromDb.id} обновлен на 'processed' (нет товаров для отправки)`);
+            }
+          } catch (statusError) {
+            logger.error(`❌ Ошибка обновления статуса сообщения: ${statusError.message}`);
+          }
         }
       } else {
         logger.warn(`   ⚠️  parsed_data не является объектом или null`);
