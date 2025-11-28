@@ -363,6 +363,20 @@
         // История запросов
         let requestHistory = [];
 
+        // Универсальная функция для обработки ошибок подключения
+        function handleConnectionError(error) {
+            if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+                return {
+                    message: 'Сервис не запущен. Запустите WhatsApp Service на порту 3000.',
+                    shouldLog: false
+                };
+            }
+            return {
+                message: error.message,
+                shouldLog: true
+            };
+        }
+
         // Примеры запросов
         const examples = {
             'send-message-1': {
@@ -401,6 +415,9 @@
         async function checkConnectionStatus() {
             try {
                 const response = await fetch('/api/status');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 const data = await response.json();
                 
                 const statusEl = document.getElementById('connectionStatus');
@@ -417,7 +434,11 @@
                 console.error('Ошибка проверки статуса:', error);
                 const statusEl = document.getElementById('connectionStatus');
                 if (statusEl) {
-                    statusEl.innerHTML = '<span class="badge bg-danger">Ошибка проверки статуса</span>';
+                    if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+                        statusEl.innerHTML = '<span class="badge bg-danger">Сервис не запущен</span><br><small class="text-muted">Запустите WhatsApp Service на порту 3000</small>';
+                    } else {
+                        statusEl.innerHTML = `<span class="badge bg-danger">Ошибка: ${error.message}</span>`;
+                    }
                 }
             }
         }
@@ -426,6 +447,9 @@
         async function loadChats() {
             try {
                 const response = await fetch('/api/chats');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 const data = await response.json();
                 
                 const select = document.getElementById('chatIdSelect');
@@ -466,14 +490,20 @@
                 populateSelect(select);
                 populateSelect(messagesSelect);
             } catch (error) {
-                console.error('Ошибка загрузки чатов:', error);
+                // Не логируем ошибки подключения, если сервис просто не запущен
+                if (!error.message.includes('Failed to fetch') && !error.message.includes('ERR_CONNECTION_REFUSED')) {
+                    console.error('Ошибка загрузки чатов:', error);
+                }
                 const select = document.getElementById('chatIdSelect');
                 const messagesSelect = document.getElementById('messagesChatIdSelect');
+                const errorText = error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED') 
+                    ? 'Сервис не запущен' 
+                    : 'Ошибка загрузки чатов';
                 if (select) {
-                    select.innerHTML = '<option value="">Ошибка загрузки чатов</option>';
+                    select.innerHTML = `<option value="">${errorText}</option>`;
                 }
                 if (messagesSelect) {
-                    messagesSelect.innerHTML = '<option value="">Ошибка загрузки чатов</option>';
+                    messagesSelect.innerHTML = `<option value="">${errorText}</option>`;
                 }
             }
         }
@@ -519,12 +549,15 @@
                 addToHistory('POST', '/api/test/send-message', { chatId, message }, data, response.status);
                 
             } catch (error) {
-                console.error('Ошибка отправки сообщения:', error);
+                const errorInfo = handleConnectionError(error);
+                if (errorInfo.shouldLog) {
+                    console.error('Ошибка отправки сообщения:', error);
+                }
                 if (responseEl) {
                     responseEl.style.display = 'block';
-                    responseEl.textContent = `Ошибка: ${error.message}`;
+                    responseEl.textContent = `Ошибка: ${errorInfo.message}`;
                 }
-                addToHistory('POST', '/api/test/send-message', { chatId, message }, { error: error.message }, 500);
+                addToHistory('POST', '/api/test/send-message', { chatId, message }, { error: errorInfo.message }, 500);
             }
         }
 
@@ -546,12 +579,15 @@
                 addToHistory('GET', '/api/chats', null, data, response.status);
                 
             } catch (error) {
-                console.error('Ошибка получения чатов:', error);
+                const errorInfo = handleConnectionError(error);
+                if (errorInfo.shouldLog) {
+                    console.error('Ошибка получения чатов:', error);
+                }
                 if (responseEl) {
                     responseEl.style.display = 'block';
-                    responseEl.textContent = `Ошибка: ${error.message}`;
+                    responseEl.textContent = `Ошибка: ${errorInfo.message}`;
                 }
-                addToHistory('GET', '/api/chats', null, { error: error.message }, 500);
+                addToHistory('GET', '/api/chats', null, { error: errorInfo.message }, 500);
             }
         }
 
@@ -581,12 +617,15 @@
                 addToHistory('GET', `/api/test/chat/${chatId}`, null, data, response.status);
                 
             } catch (error) {
-                console.error('Ошибка получения информации о чате:', error);
+                const errorInfo = handleConnectionError(error);
+                if (errorInfo.shouldLog) {
+                    console.error('Ошибка получения информации о чате:', error);
+                }
                 if (responseEl) {
                     responseEl.style.display = 'block';
-                    responseEl.textContent = `Ошибка: ${error.message}`;
+                    responseEl.textContent = `Ошибка: ${errorInfo.message}`;
                 }
-                addToHistory('GET', `/api/test/chat/${chatId}`, null, { error: error.message }, 500);
+                addToHistory('GET', `/api/test/chat/${chatId}`, null, { error: errorInfo.message }, 500);
             }
         }
 
@@ -608,12 +647,15 @@
                 addToHistory('GET', '/api/test/contacts', null, data, response.status);
                 
             } catch (error) {
-                console.error('Ошибка получения контактов:', error);
+                const errorInfo = handleConnectionError(error);
+                if (errorInfo.shouldLog) {
+                    console.error('Ошибка получения контактов:', error);
+                }
                 if (responseEl) {
                     responseEl.style.display = 'block';
-                    responseEl.textContent = `Ошибка: ${error.message}`;
+                    responseEl.textContent = `Ошибка: ${errorInfo.message}`;
                 }
-                addToHistory('GET', '/api/test/contacts', null, { error: error.message }, 500);
+                addToHistory('GET', '/api/test/contacts', null, { error: errorInfo.message }, 500);
             }
         }
 
@@ -635,12 +677,15 @@
                 addToHistory('GET', '/api/test/client-info', null, data, response.status);
                 
             } catch (error) {
-                console.error('Ошибка получения информации о клиенте:', error);
+                const errorInfo = handleConnectionError(error);
+                if (errorInfo.shouldLog) {
+                    console.error('Ошибка получения информации о клиенте:', error);
+                }
                 if (responseEl) {
                     responseEl.style.display = 'block';
-                    responseEl.textContent = `Ошибка: ${error.message}`;
+                    responseEl.textContent = `Ошибка: ${errorInfo.message}`;
                 }
-                addToHistory('GET', '/api/test/client-info', null, { error: error.message }, 500);
+                addToHistory('GET', '/api/test/client-info', null, { error: errorInfo.message }, 500);
             }
         }
 
@@ -674,12 +719,15 @@
                 addToHistory('GET', url, { chatId, limit }, data, response.status);
                 
             } catch (error) {
-                console.error('Ошибка получения сообщений:', error);
+                const errorInfo = handleConnectionError(error);
+                if (errorInfo.shouldLog) {
+                    console.error('Ошибка получения сообщений:', error);
+                }
                 if (responseEl) {
                     responseEl.style.display = 'block';
-                    responseEl.textContent = `Ошибка: ${error.message}`;
+                    responseEl.textContent = `Ошибка: ${errorInfo.message}`;
                 }
-                addToHistory('GET', `/api/test/chat/${chatId}/messages`, { chatId, limit }, { error: error.message }, 500);
+                addToHistory('GET', `/api/test/chat/${chatId}/messages`, { chatId, limit }, { error: errorInfo.message }, 500);
             }
         }
 

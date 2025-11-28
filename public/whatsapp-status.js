@@ -34,11 +34,18 @@
                 badge.textContent = `⚠️ ${data.status || 'Не готов'}`;
             }
         } catch (error) {
-            console.error('Ошибка получения статуса WhatsApp:', error);
+            // Не логируем ошибки подключения в консоль, если сервис просто не запущен
+            if (!error.message.includes('Failed to fetch') && !error.message.includes('ERR_CONNECTION_REFUSED')) {
+                console.error('Ошибка получения статуса WhatsApp:', error);
+            }
             const badge = document.getElementById('serviceStatusBadge');
             if (badge) {
                 badge.className = 'badge bg-danger';
-                badge.textContent = '❌ Ошибка';
+                if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+                    badge.textContent = '❌ Сервис не запущен';
+                } else {
+                    badge.textContent = '❌ Ошибка';
+                }
             }
         }
     }
