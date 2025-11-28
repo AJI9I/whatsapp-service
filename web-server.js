@@ -1638,60 +1638,158 @@ app.get('/api/test/chat/:chatId/messages', async (req, res) => {
     try {
       const chat = await client.getChatById(chatId);
       
-      // Получаем последние сообщения
-      const messages = await chat.fetchMessages({ limit: limit });
+      // Получаем последние сообщения с обработкой ошибок и таймаутом
+      let messages;
+      try {
+        // Добавляем таймаут для получения сообщений (30 секунд)
+        const fetchPromise = chat.fetchMessages({ limit: limit });
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout: получение сообщений превысило 30 секунд')), 30000)
+        );
+        
+        messages = await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (fetchError) {
+        logger.error(`❌ Ошибка получения сообщений из чата: ${fetchError.message}`);
+        if (fetchError.stack) {
+          logger.error(`Stack trace: ${fetchError.stack}`);
+        }
+        throw new Error(`Не удалось получить сообщения: ${fetchError.message}`);
+      }
       
-      const messagesData = messages.map(msg => {
-        const messageData = {
-          id: msg.id?._serialized || msg.id?.user || 'unknown',
-          timestamp: msg.timestamp || null,
-          from: msg.from || null,
-          to: msg.to || null,
-          body: msg.body || '',
-          type: msg.type || 'unknown',
-          hasMedia: msg.hasMedia || false,
-          isForwarded: msg.isForwarded || false,
-          isStarred: msg.isStarred || false,
-          fromMe: msg.fromMe || false
-        };
-        
-        // Если есть медиа, добавляем информацию о медиа
-        if (msg.hasMedia) {
-          messageData.mediaType = msg.type || null;
-          messageData.mediaFilename = msg.filename || null;
-          messageData.mediaMimetype = msg.mimetype || null;
-        }
-        
-        // Если есть информация об отправителе
-        if (msg.from && msg.from !== 'status@broadcast') {
-          try {
-            const contact = msg.getContact();
-            if (contact) {
-              messageData.sender = {
-                id: contact.id?._serialized || contact.id?.user || 'unknown',
-                name: contact.name || contact.pushname || contact.number || 'Unknown',
-                pushname: contact.pushname || null,
-                number: contact.number || null
-              };
+      if (!Array.isArray(messages)) {
+        logger.warn(`⚠️  fetchMessages вернул не массив: ${typeof messages}`);
+        messages = [];
+      }
+      
+      const messagesData = [];
+      const seen = new WeakSet(); // Для отслеживания циклических ссылок
+      
+      // Обрабатываем сообщения последовательно с ограничением времени на каждое
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        try {
+          const messageData = {
+            id: msg.id?._serialized || msg.id?.user || 'unknown',
+            timestamp: msg.timestamp || null,
+            from: msg.from || null,
+            to: msg.to || null,
+            body: (msg.body || '').substring(0, 10000), // Ограничиваем длину текста
+            type: msg.type || 'unknown',
+            hasMedia: msg.hasMedia || false,
+            isForwarded: msg.isForwarded || false,
+            isStarred: msg.isStarred || false,
+            fromMe: msg.fromMe || false
+          };
+          
+          // Если есть медиа, добавляем информацию о медиа (без самих данных)
+          if (msg.hasMedia) {
+            try {
+              messageData.mediaType = msg.type || null;
+              messageData.mediaFilename = msg.filename || null;
+              messageData.mediaMimetype = msg.mimetype || null;
+              // НЕ включаем медиа данные, чтобы не перегружать ответ
+            } catch (mediaError) {
+              logger.warn(`⚠️  Ошибка получения информации о медиа: ${mediaError.message}`);
             }
-          } catch (contactError) {
-            logger.warn(`⚠️  Ошибка получения информации об отправителе: ${contactError.message}`);
           }
+          
+          // Если есть информация об отправителе, получаем её безопасно
+          if (msg.from && msg.from !== 'status@broadcast') {
+            try {
+              // Используем await для асинхронного getContact() с таймаутом
+              const contactPromise = msg.getContact();
+              const contactTimeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout получения контакта')), 5000)
+              );
+              
+              const contact = await Promise.race([contactPromise, contactTimeout]);
+              
+              if (contact && !seen.has(contact)) {
+                seen.add(contact);
+                messageData.sender = {
+                  id: contact.id?._serialized || contact.id?.user || 'unknown',
+                  name: (contact.name || contact.pushname || contact.number || 'Unknown').substring(0, 200),
+                  pushname: (contact.pushname || null) ? contact.pushname.substring(0, 200) : null,
+                  number: contact.number || null
+                };
+              }
+            } catch (contactError) {
+              // Если не удалось получить контакт, просто пропускаем эту информацию
+              if (!contactError.message.includes('Timeout')) {
+                logger.debug(`⚠️  Ошибка получения информации об отправителе: ${contactError.message}`);
+              }
+              // Используем базовую информацию из сообщения
+              if (msg.from) {
+                messageData.sender = {
+                  id: msg.from,
+                  name: 'Unknown',
+                  pushname: null,
+                  number: null
+                };
+              }
+            }
+          }
+          
+          messagesData.push(messageData);
+        } catch (msgError) {
+          logger.error(`❌ Ошибка обработки сообщения: ${msgError.message}`);
+          // Добавляем сообщение об ошибке вместо полного сообщения
+          messagesData.push({
+            id: 'error',
+            error: `Ошибка обработки сообщения: ${msgError.message}`,
+            timestamp: null
+          });
         }
-        
-        return messageData;
-      });
+      }
       
       logger.info(`✅ Получено сообщений: ${messagesData.length}`);
       
-      res.json({
-        success: true,
-        chatId: chatId,
-        chatName: chat.name || 'Unknown',
-        messages: messagesData,
-        count: messagesData.length,
-        limit: limit
-      });
+      // Безопасная сериализация с обработкой циклических ссылок
+      const safeSerialize = (obj) => {
+        const seen = new WeakSet();
+        return JSON.stringify(obj, (key, value) => {
+          if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) {
+              return '[Circular Reference]';
+            }
+            seen.add(value);
+          }
+          if (typeof value === 'function') {
+            return '[Function]';
+          }
+          if (typeof value === 'undefined') {
+            return '[Undefined]';
+          }
+          return value;
+        }, 2);
+      };
+      
+      try {
+        const responseData = {
+          success: true,
+          chatId: chatId,
+          chatName: chat.name || 'Unknown',
+          messages: messagesData,
+          count: messagesData.length,
+          limit: limit
+        };
+        
+        // Проверяем размер ответа
+        const responseSize = JSON.stringify(responseData).length;
+        if (responseSize > 10 * 1024 * 1024) { // Больше 10MB
+          logger.warn(`⚠️  Размер ответа очень большой: ${(responseSize / 1024 / 1024).toFixed(2)}MB`);
+          responseData.warning = 'Размер ответа очень большой, некоторые данные могут быть урезаны';
+        }
+        
+        res.json(responseData);
+      } catch (serializeError) {
+        logger.error(`❌ Ошибка сериализации ответа: ${serializeError.message}`);
+        res.status(500).json({
+          success: false,
+          error: `Ошибка сериализации данных: ${serializeError.message}`,
+          errorType: serializeError.name
+        });
+      }
     } catch (error) {
       logger.error(`❌ Ошибка получения сообщений: ${error.message}`);
       res.status(500).json({ 

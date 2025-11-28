@@ -695,6 +695,7 @@
             const messagesSelect = document.getElementById('messagesChatIdSelect');
             const limitSelect = document.getElementById('messagesLimit');
             const responseEl = document.getElementById('getChatMessagesResponse');
+            const button = event?.target || document.querySelector('button[onclick="getChatMessages()"]');
             
             const chatId = chatIdInput?.value || messagesSelect?.value;
             const limit = limitSelect?.value || '3';
@@ -704,16 +705,50 @@
                 return;
             }
             
+            // Показываем индикатор загрузки
+            if (responseEl) {
+                responseEl.style.display = 'block';
+                responseEl.textContent = '⏳ Загрузка сообщений...';
+            }
+            if (button) {
+                button.disabled = true;
+                const originalText = button.textContent;
+                button.textContent = '⏳ Загрузка...';
+            }
+            
             try {
                 const url = `/api/test/chat/${encodeURIComponent(chatId)}/messages?limit=${limit}`;
                 addToHistory('GET', url, { chatId, limit });
                 
-                const response = await fetch(url);
+                // Добавляем таймаут для запроса (35 секунд)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 35000);
+                
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
                 if (responseEl) {
-                    responseEl.style.display = 'block';
-                    responseEl.textContent = JSON.stringify(data, null, 2);
+                    try {
+                        // Безопасная сериализация с обработкой больших данных
+                        const jsonString = JSON.stringify(data, null, 2);
+                        const sizeMB = jsonString.length / 1024 / 1024;
+                        
+                        if (sizeMB > 1) { // Больше 1MB
+                            responseEl.textContent = `⚠️ Размер ответа очень большой (${sizeMB.toFixed(2)}MB). Показываем первые 500KB:\n\n${jsonString.substring(0, 500000)}...\n\n[Данные обрезаны - попробуйте уменьшить количество сообщений]`;
+                        } else {
+                            responseEl.textContent = jsonString;
+                        }
+                    } catch (serializeError) {
+                        responseEl.textContent = `Ошибка отображения данных: ${serializeError.message}\n\nПопробуйте уменьшить количество сообщений или проверьте формат данных.`;
+                        console.error('Ошибка сериализации:', serializeError);
+                    }
                 }
                 
                 addToHistory('GET', url, { chatId, limit }, data, response.status);
@@ -724,10 +759,19 @@
                     console.error('Ошибка получения сообщений:', error);
                 }
                 if (responseEl) {
-                    responseEl.style.display = 'block';
-                    responseEl.textContent = `Ошибка: ${errorInfo.message}`;
+                    let errorMessage = errorInfo.message;
+                    if (error.name === 'AbortError') {
+                        errorMessage = 'Превышено время ожидания (35 секунд). Попробуйте уменьшить количество сообщений.';
+                    }
+                    responseEl.textContent = `Ошибка: ${errorMessage}`;
                 }
                 addToHistory('GET', `/api/test/chat/${chatId}/messages`, { chatId, limit }, { error: errorInfo.message }, 500);
+            } finally {
+                // Восстанавливаем кнопку
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = 'Получить сообщения';
+                }
             }
         }
 
