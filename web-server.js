@@ -1614,6 +1614,99 @@ app.get('/api/test/chat/:chatId', async (req, res) => {
 });
 
 /**
+ * API для тестирования WhatsApp
+ * GET /api/test/chat/:chatId/messages - Получить последние сообщения из чата
+ */
+app.get('/api/test/chat/:chatId/messages', async (req, res) => {
+  try {
+    const client = getClient();
+    
+    if (!client) {
+      return res.status(503).json({ error: 'WhatsApp клиент не инициализирован' });
+    }
+    
+    const status = getClientStatus();
+    if (!status.isReady) {
+      return res.status(503).json({ error: `WhatsApp клиент не готов (статус: ${status.status})` });
+    }
+    
+    const chatId = req.params.chatId;
+    const limit = parseInt(req.query.limit || '3'); // По умолчанию 3 сообщения
+    
+    logger.info(`📋 Получение последних ${limit} сообщений из чата: ${chatId}`);
+    
+    try {
+      const chat = await client.getChatById(chatId);
+      
+      // Получаем последние сообщения
+      const messages = await chat.fetchMessages({ limit: limit });
+      
+      const messagesData = messages.map(msg => {
+        const messageData = {
+          id: msg.id?._serialized || msg.id?.user || 'unknown',
+          timestamp: msg.timestamp || null,
+          from: msg.from || null,
+          to: msg.to || null,
+          body: msg.body || '',
+          type: msg.type || 'unknown',
+          hasMedia: msg.hasMedia || false,
+          isForwarded: msg.isForwarded || false,
+          isStarred: msg.isStarred || false,
+          fromMe: msg.fromMe || false
+        };
+        
+        // Если есть медиа, добавляем информацию о медиа
+        if (msg.hasMedia) {
+          messageData.mediaType = msg.type || null;
+          messageData.mediaFilename = msg.filename || null;
+          messageData.mediaMimetype = msg.mimetype || null;
+        }
+        
+        // Если есть информация об отправителе
+        if (msg.from && msg.from !== 'status@broadcast') {
+          try {
+            const contact = msg.getContact();
+            if (contact) {
+              messageData.sender = {
+                id: contact.id?._serialized || contact.id?.user || 'unknown',
+                name: contact.name || contact.pushname || contact.number || 'Unknown',
+                pushname: contact.pushname || null,
+                number: contact.number || null
+              };
+            }
+          } catch (contactError) {
+            logger.warn(`⚠️  Ошибка получения информации об отправителе: ${contactError.message}`);
+          }
+        }
+        
+        return messageData;
+      });
+      
+      logger.info(`✅ Получено сообщений: ${messagesData.length}`);
+      
+      res.json({
+        success: true,
+        chatId: chatId,
+        chatName: chat.name || 'Unknown',
+        messages: messagesData,
+        count: messagesData.length,
+        limit: limit
+      });
+    } catch (error) {
+      logger.error(`❌ Ошибка получения сообщений: ${error.message}`);
+      res.status(500).json({ 
+        success: false,
+        error: error.message,
+        errorType: error.name
+      });
+    }
+  } catch (error) {
+    logger.error(`Ошибка обработки запроса на получение сообщений: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Webhook для получения результатов от Ollama Service
  */
 app.post('/api/webhook/ollama-result', async (req, res) => {
