@@ -289,6 +289,57 @@
                     </div>
                 </div>
 
+                <!-- Обработка последних сообщений из группы -->
+                <div class="row">
+                    <div class="col-xl-12">
+                        <div class="card custom-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="card-title">
+                                    <i class="fe fe-message-circle me-2"></i>Обработка последних сообщений
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label for="processMessagesChatId" class="form-label">Выберите группу</label>
+                                        <select class="form-select" id="processMessagesChatId">
+                                            <option value="">Загрузка групп...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="processMessagesLimit" class="form-label">Количество сообщений</label>
+                                        <select class="form-select" id="processMessagesLimit">
+                                            <option value="3" selected>3 (последние)</option>
+                                            <option value="5">5</option>
+                                            <option value="10">10</option>
+                                            <option value="20">20</option>
+                                            <option value="50">50</option>
+                                            <option value="100">100</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">&nbsp;</label>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-primary" onclick="processChatMessages()" id="processMessagesBtn">
+                                                <i class="fe fe-play me-1"></i>Обработать сообщения
+                                            </button>
+                                            <button type="button" class="btn btn-secondary" onclick="clearProcessMessagesResult()">
+                                                <i class="fe fe-x me-1"></i>Очистить
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <div id="processMessagesResult" style="display: none;">
+                                        <h6>Результат обработки:</h6>
+                                        <div class="alert alert-info" id="processMessagesResultContent"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Список чатов -->
                 <div class="row">
                     <div class="col-xl-12">
@@ -597,7 +648,23 @@
                     return;
                 }
                 
-                console.log('📋 ШАГ 9: Вызов displayChats()...');
+                console.log('📋 ШАГ 9: Заполнение select для обработки сообщений...');
+                const selectStartTime = performance.now();
+                const processSelect = document.getElementById('processMessagesChatId');
+                if (processSelect) {
+                    processSelect.innerHTML = '<option value="">Выберите группу...</option>';
+                    allGroups.forEach(group => {
+                        const option = document.createElement('option');
+                        option.value = group.id;
+                        option.textContent = `${group.name || 'Без имени'} (${group.id})`;
+                        processSelect.appendChild(option);
+                    });
+                    console.log(`✅ Заполнено ${allGroups.length} групп в select`);
+                }
+                const selectDuration = performance.now() - selectStartTime;
+                console.log(`✅ Заполнение select выполнено за ${selectDuration.toFixed(2)}мс`);
+                
+                console.log('📋 ШАГ 10: Вызов displayChats()...');
                 const displayStartTime = performance.now();
                 displayChats();
                 const displayDuration = performance.now() - displayStartTime;
@@ -1205,6 +1272,74 @@
                 }
             };
         }
+
+        // Обработка последних сообщений из группы
+        window.processChatMessages = async function() {
+            const chatId = document.getElementById('processMessagesChatId').value;
+            const limit = parseInt(document.getElementById('processMessagesLimit').value) || 3;
+            const resultDiv = document.getElementById('processMessagesResult');
+            const resultContent = document.getElementById('processMessagesResultContent');
+            const processBtn = document.getElementById('processMessagesBtn');
+            
+            if (!chatId) {
+                alert('Выберите группу для обработки');
+                return;
+            }
+            
+            const originalBtnText = processBtn.innerHTML;
+            processBtn.disabled = true;
+            processBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Обработка...';
+            resultDiv.style.display = 'block';
+            resultContent.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Получение и обработка сообщений...';
+            
+            try {
+                const response = await fetch(`/api/chat/${encodeURIComponent(chatId)}/process-messages?limit=${limit}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    let html = '<h6>✅ Обработка завершена успешно</h6>';
+                    html += `<p><strong>Обработано сообщений:</strong> ${data.processed || 0}</p>`;
+                    html += `<p><strong>Успешно:</strong> ${data.successCount || 0}</p>`;
+                    html += `<p><strong>Ошибок:</strong> ${data.errorCount || 0}</p>`;
+                    
+                    if (data.errors && data.errors.length > 0) {
+                        html += '<details class="mt-2"><summary>Ошибки обработки</summary><ul class="mt-2">';
+                        data.errors.forEach((error, index) => {
+                            html += `<li><small>${index + 1}. ${escapeHtml(error)}</small></li>`;
+                        });
+                        html += '</ul></details>';
+                    }
+                    
+                    resultContent.className = 'alert alert-success';
+                    resultContent.innerHTML = html;
+                } else {
+                    resultContent.className = 'alert alert-danger';
+                    resultContent.innerHTML = `<strong>❌ Ошибка обработки:</strong> ${escapeHtml(data.error || 'Неизвестная ошибка')}`;
+                }
+            } catch (error) {
+                console.error('❌ Ошибка обработки сообщений:', error);
+                resultContent.className = 'alert alert-danger';
+                resultContent.innerHTML = `<strong>❌ Ошибка:</strong> ${escapeHtml(error.message)}`;
+            } finally {
+                processBtn.disabled = false;
+                processBtn.innerHTML = originalBtnText;
+            }
+        };
+        
+        // Очистка результата обработки
+        window.clearProcessMessagesResult = function() {
+            const resultDiv = document.getElementById('processMessagesResult');
+            const resultContent = document.getElementById('processMessagesResultContent');
+            if (resultDiv) resultDiv.style.display = 'none';
+            if (resultContent) {
+                resultContent.innerHTML = '';
+                resultContent.className = 'alert alert-info';
+            }
+        };
 
         // Удаление задания
         async function deleteTask(taskId) {
