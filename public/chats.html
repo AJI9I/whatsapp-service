@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr" data-nav-layout="vertical" data-theme-mode="light" data-header-styles="light" data-menu-styles="light" data-toggled="open">
+
+<head>
+    <!-- Meta Data -->
+    <meta charset="UTF-8">
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Чаты - WhatsApp Service</title>
+    <meta name="Description" content="Управление чатами WhatsApp">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="/bootstrap-theme/assets/images/brand-logos/favicon.ico" type="image/x-icon">
+    
+    <!-- Bootstrap Css -->
+    <link id="style" href="/bootstrap-theme/assets/libs/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Style Css -->
+    <link href="/bootstrap-theme/assets/css/styles.min.css" rel="stylesheet">
+    
+    <!-- Icons Css -->
+    <link href="/bootstrap-theme/assets/css/icons.css" rel="stylesheet">
+    
+    <!-- Node Waves Css -->
+    <link href="/bootstrap-theme/assets/libs/node-waves/waves.min.css" rel="stylesheet">
+    
+    <!-- Simplebar Css -->
+    <link href="/bootstrap-theme/assets/libs/simplebar/simplebar.min.css" rel="stylesheet">
+    
+    <!-- Общее меню -->
+    <script src="/menu.js"></script>
+    
+    <!-- Компонент статуса WhatsApp -->
+    <script src="/whatsapp-status.js"></script>
+    
+    <!-- Fix for missing DOM elements - MUST be before other scripts -->
+    <script>
+        // Global error handler to prevent script errors from breaking the page
+        window.addEventListener('error', function(e) {
+            const errorMessage = e.message || '';
+            const errorFilename = e.filename || '';
+            
+            if (errorMessage.includes('Cannot read properties of null') ||
+                errorMessage.includes('classList') ||
+                errorMessage.includes('addEventListener') ||
+                errorMessage.includes('appendChild') ||
+                errorFilename.includes('defaultmenu.min.js') ||
+                errorFilename.includes('custom-switcher.min.js') ||
+                errorFilename.includes('custom.js')) {
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+            }
+        }, true);
+        
+        // Ensure all required DOM elements exist before scripts execute
+        (function() {
+            let isEnsuring = false;
+            
+            window.ensureElements = function ensureElements() {
+                if (isEnsuring) return;
+                isEnsuring = true;
+                
+                try {
+                    if (!document.getElementById('loader')) {
+                        const loader = document.createElement('div');
+                        loader.id = 'loader';
+                        loader.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>';
+                        loader.style.display = 'none';
+                        document.body.appendChild(loader);
+                    }
+                    
+                    if (!document.querySelector('.horizontal-menu')) {
+                        const headerContainer = document.querySelector('.main-header-container');
+                        if (headerContainer) {
+                            const headerCenter = document.createElement('div');
+                            headerCenter.className = 'main-header-center d-none d-lg-block';
+                            headerCenter.style.display = 'none';
+                            const horizontalMenu = document.createElement('nav');
+                            horizontalMenu.className = 'horizontal-menu';
+                            const ul = document.createElement('ul');
+                            ul.className = 'horizontal-list';
+                            horizontalMenu.appendChild(ul);
+                            headerCenter.appendChild(horizontalMenu);
+                            headerContainer.appendChild(headerCenter);
+                        }
+                    }
+                    
+                    if (!document.getElementById('switcher-canvas')) {
+                        const switcher = document.createElement('div');
+                        switcher.className = 'offcanvas offcanvas-end';
+                        switcher.id = 'switcher-canvas';
+                        switcher.setAttribute('tabindex', '-1');
+                        switcher.setAttribute('aria-labelledby', 'offcanvasRightLabel');
+                        switcher.innerHTML = '<div class="offcanvas-header border-bottom"><h5 class="offcanvas-title text-default" id="offcanvasRightLabel">Switcher</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button></div><div class="offcanvas-body"></div>';
+                        document.body.appendChild(switcher);
+                    }
+                    
+                    if (!document.getElementById('header-sidebar')) {
+                        const headerSidebar = document.createElement('div');
+                        headerSidebar.className = 'offcanvas offcanvas-end';
+                        headerSidebar.id = 'header-sidebar';
+                        headerSidebar.setAttribute('tabindex', '-1');
+                        headerSidebar.setAttribute('aria-labelledby', 'sidebarLabel');
+                        headerSidebar.innerHTML = '<div class="offcanvas-header rounded-0"><h5 class="fs-14 text-uppercase mb-0 fw-semibold" id="sidebarLabel">Меню</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button></div><div class="offcanvas-body rounded-0 p-0"></div>';
+                        document.body.appendChild(headerSidebar);
+                    }
+                    
+                    if (!document.querySelector('.scrollToTop')) {
+                        const scrollToTop = document.createElement('div');
+                        scrollToTop.className = 'scrollToTop';
+                        scrollToTop.innerHTML = '<span class="arrow"><i class="las la-angle-double-up"></i></span>';
+                        document.body.appendChild(scrollToTop);
+                    }
+                    
+                    if (!document.getElementById('responsive-overlay')) {
+                        const overlay = document.createElement('div');
+                        overlay.id = 'responsive-overlay';
+                        document.body.appendChild(overlay);
+                    }
+                    
+                    const loader = document.getElementById('loader');
+                    if (loader) {
+                        loader.style.display = 'none';
+                    }
+                } catch (e) {
+                    console.warn('Error in ensureElements:', e);
+                } finally {
+                    isEnsuring = false;
+                }
+            };
+            
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    window.ensureElements();
+                    setTimeout(window.ensureElements, 100);
+                });
+            } else {
+                window.ensureElements();
+                setTimeout(window.ensureElements, 100);
+            }
+        })();
+    </script>
+    
+    <style>
+        .app-sidebar {
+            display: block !important;
+            visibility: visible !important;
+        }
+        .main-menu {
+            display: block !important;
+        }
+        .side-menu__item {
+            display: flex !important;
+            align-items: center !important;
+            padding: 0.75rem 1.25rem !important;
+            color: #495057 !important;
+            text-decoration: none !important;
+        }
+        .side-menu__item:hover {
+            background-color: #f8f9fa !important;
+        }
+        .side-menu__item.active {
+            background-color: #e7f1ff !important;
+            color: #0d6efd !important;
+        }
+        .side-menu__icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.75rem;
+            fill: currentColor;
+        }
+        .side-menu__label {
+            display: block !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Page Loader -->
+    <div id="loader" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+    <!-- Page Loader -->
+
+    <!-- Start Switcher -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="switcher-canvas" aria-labelledby="offcanvasRightLabel">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title text-default" id="offcanvasRightLabel">Switcher</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <p>Switcher content</p>
+        </div>
+    </div>
+    <!-- End Switcher -->
+    
+    <div class="page">
+        <!-- app-header -->
+        <header class="app-header">
+            <div class="main-header-container container-fluid">
+                <div class="header-content-left">
+                    <div class="header-element">
+                        <a aria-label="Toggle Sidebar" class="sidemenu-toggle header-link animated-arrow hor-toggle horizontal-navtoggle" data-bs-toggle="sidebar" href="javascript:void(0);">
+                            <i class="header-icon fe fe-align-left"></i>
+                        </a>
+                        <div class="main-header-center d-none d-lg-block" style="display: none !important;">
+                            <nav class="horizontal-menu">
+                                <ul class="horizontal-list"></ul>
+                            </nav>
+                        </div>
+                    </div>
+                    <div class="header-element">
+                        <div class="horizontal-logo">
+                            <a href="/" class="header-logo">
+                                <span class="desktop-logo">📱 WhatsApp Service</span>
+                                <span class="toggle-logo">WhatsApp</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-content-right">
+                    <div class="header-element">
+                        <span class="badge bg-success" id="serviceStatusBadge">Проверка...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <!-- /app-header -->
+
+        <!-- Start::app-sidebar -->
+        <aside class="app-sidebar sticky" id="sidebar">
+            <div class="main-sidebar-header">
+                <a href="/" class="header-logo">
+                    <span class="desktop-logo">📱 WhatsApp</span>
+                    <span class="toggle-logo">WA</span>
+                </a>
+            </div>
+            <div class="main-sidebar" id="sidebar-scroll">
+                <nav class="main-menu-container nav nav-pills flex-column sub-open">
+                    <div class="slide-left" id="slide-left">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="#7b8191" width="24" height="24" viewBox="0 0 24 24"> <path d="M13.293 6.293 7.586 12l5.707 5.707 1.414-1.414L10.414 12l4.293-4.293z"></path> </svg>
+                    </div>
+                    <ul class="main-menu" id="main-menu">
+                        <!-- Меню будет вставлено автоматически через menu.js -->
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+        <!-- End::app-sidebar -->
+
+        <!--APP-CONTENT START-->
+        <div class="main-content app-content">
+            <div class="container-fluid">
+                <div class="d-md-flex d-block align-items-center justify-content-between my-4 page-header-breadcrumb">
+                    <div class="my-auto">
+                        <h5 class="page-title fs-21 mb-1">Чаты</h5>
+                        <nav>
+                            <ol class="breadcrumb mb-0">
+                                <li class="breadcrumb-item"><a href="/">Главная</a></li>
+                                <li class="breadcrumb-item active" aria-current="page">Чаты</li>
+                            </ol>
+                        </nav>
+                    </div>
+                </div>
+                
+                <!-- Задания -->
+                <div class="row">
+                    <div class="col-xl-12">
+                        <div class="card custom-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="card-title">
+                                    <i class="fe fe-list me-2"></i>Задания мониторинга
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="showAddTaskModal()">
+                                    <i class="fe fe-plus me-1"></i>Добавить задание
+                                </button>
+                            </div>
+                            <div class="card-body" style="min-width: 100%; width: 100%;">
+                                <div id="tasksList" style="width: 100%; min-width: 100%;">
+                                    <div class="text-center text-muted p-3">
+                                        <span class="loading"></span> Загрузка заданий...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Список чатов -->
+                <div class="row">
+                    <div class="col-xl-12">
+                        <div class="card custom-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="card-title">
+                                    <i class="fe fe-users me-2"></i>Список групп
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="refreshChats(false)" title="Обновить из кэша (быстро)">
+                                    <i class="fe fe-refresh-cw me-1"></i>Обновить
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning" onclick="refreshChats(true)" title="Принудительное обновление с сервера">
+                                    <i class="fe fe-refresh-cw me-1"></i>Обновить с сервера
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="showTestMessageModal()" title="Отправить тестовое сообщение">
+                                    <i class="fe fe-send me-1"></i>Тестовое сообщение
+                                </button>
+                            </div>
+                            <div class="card-body" style="min-width: 100%;">
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" id="chatSearchInput" 
+                                           placeholder="Поиск групп..." oninput="filterChats()" style="width: 100%;">
+                                </div>
+                                <div id="chatsList" style="max-height: 600px; overflow-y: auto; width: 100%; min-width: 100%;">
+                                    <div class="text-center text-muted p-3">
+                                        <span class="loading"></span> Загрузка чатов...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Start -->
+        <footer class="footer mt-auto py-4 bg-white">
+            <div class="container-fluid">
+                <div class="text-center">
+                    <span class="text-muted">WhatsApp Service &copy; 2025</span>
+                </div>
+            </div>
+        </footer>
+        <!-- Footer End -->
+    </div>
+
+    <!-- Scroll To Top -->
+    <div class="scrollToTop">
+        <span class="arrow"><i class="las la-angle-double-up"></i></span>
+    </div>
+    <div id="responsive-overlay"></div>
+    <!-- Scroll To Top -->
+
+    <!-- Popper JS -->
+    <script src="/bootstrap-theme/assets/libs/@popperjs/core/umd/popper.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/node-waves/waves.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/simplebar/simplebar.min.js"></script>
+    <!-- Custom JS для работы меню -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof window.ensureElements === 'function') {
+                window.ensureElements();
+                setTimeout(window.ensureElements, 200);
+                setTimeout(window.ensureElements, 500);
+            }
+            
+            setTimeout(function() {
+                const scripts = [
+                    '/bootstrap-theme/assets/js/defaultmenu.min.js',
+                    '/bootstrap-theme/assets/js/custom-switcher.min.js',
+                    '/bootstrap-theme/assets/js/custom.js'
+                ];
+                
+                scripts.forEach(function(src) {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.onerror = function() {};
+                    document.body.appendChild(script);
+                });
+            }, 300);
+        });
+
+        // Переменные для работы с чатами и заданиями
+        let allChats = [];
+        let selectedChatIds = new Set();
+        let availablePrompts = [];
+        let tasks = [];
+
+        // Загрузка чатов
+        async function refreshChats(force = false) {
+            const startTime = performance.now();
+            console.log('═'.repeat(80));
+            console.log('🔄 НАЧАЛО ЗАГРУЗКИ ЧАТОВ');
+            console.log('═'.repeat(80));
+            console.log('⏰ Время начала:', new Date().toISOString());
+            
+            try {
+                console.log('📋 ШАГ 1: Поиск элемента chatsList...');
+                const container = document.getElementById('chatsList');
+                if (!container) {
+                    console.error('❌ ЭЛЕМЕНТ chatsList НЕ НАЙДЕН!');
+                    console.error('🔍 Проверка DOM:');
+                    console.error('   - document.body:', document.body ? 'существует' : 'НЕ СУЩЕСТВУЕТ');
+                    console.error('   - document.getElementById("chatsList"):', document.getElementById('chatsList'));
+                    return;
+                }
+                console.log('✅ Элемент chatsList найден:', {
+                    tagName: container.tagName,
+                    id: container.id,
+                    className: container.className,
+                    innerHTML: container.innerHTML.substring(0, 100) + '...'
+                });
+                
+                console.log('📋 ШАГ 2: Установка индикатора загрузки...');
+                container.innerHTML = '<div class="text-center text-muted p-3"><span class="loading"></span> Загрузка чатов...</div>';
+                console.log('✅ Индикатор загрузки установлен');
+                
+                console.log('📋 ШАГ 3: Отправка запроса к /api/chats...');
+                const fetchStartTime = performance.now();
+                
+                // Добавляем таймаут для запроса (120 секунд - обработка 516 чатов может занять время)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                    console.error('❌ ТАЙМАУТ: Запрос к /api/chats превысил 120 секунд');
+                }, 120000);
+                
+                let response;
+                let data; // Объявляем data вне try, чтобы она была доступна после блока
+                let fetchDuration = 0; // Объявляем fetchDuration вне try
+                let parseDuration = 0; // Объявляем parseDuration вне try
+                try {
+                    // Используем параметр force из функции
+                    const apiUrl = force ? '/api/chats?force=true' : '/api/chats';
+                    
+                    console.log('📡 Выполнение fetch...');
+                    console.log('📋 URL запроса: ' + apiUrl);
+                    console.log('📋 Метод: GET');
+                    console.log('📋 Принудительное обновление: ' + (force ? 'ДА' : 'НЕТ (используется кэш)'));
+                    console.log('📋 Таймаут: 120 секунд');
+                    
+                    // Добавляем промежуточное логирование каждые 5 секунд
+                    const progressInterval = setInterval(() => {
+                        const elapsed = (performance.now() - fetchStartTime) / 1000;
+                        console.log(`⏳ Ожидание ответа... (прошло ${elapsed.toFixed(1)} секунд)`);
+                    }, 5000);
+                    
+                    response = await fetch(apiUrl, {
+                        signal: controller.signal,
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    clearInterval(progressInterval);
+                    clearTimeout(timeoutId);
+                    fetchDuration = performance.now() - fetchStartTime;
+                    console.log(`✅ Получен ответ: HTTP ${response.status} ${response.statusText}`);
+                    console.log(`⏱️ Время запроса: ${fetchDuration.toFixed(2)}мс`);
+                    
+                    data = await response.json();
+                    console.log('📋 Детали ответа:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        ok: response.ok,
+                        cached: data.cached || false,
+                        cacheAge: data.cacheAge ? `${(data.cacheAge / 1000).toFixed(1)} сек` : 'N/A',
+                        groupsCount: data.groups?.length || 0,
+                        personalChatsCount: data.personalChats?.length || 0
+                    });
+                    
+                    if (data.cached) {
+                        console.log(`💾 Данные из кэша (возраст: ${data.cacheAge ? (data.cacheAge / 1000).toFixed(1) : 'N/A'} сек)`);
+                    } else {
+                        console.log(`🔄 Данные загружены с сервера (кэш обновлен)`);
+                    }
+                } catch (fetchError) {
+                    clearTimeout(timeoutId);
+                    const fetchDuration = performance.now() - fetchStartTime;
+                    console.error('❌ ОШИБКА ПРИ ВЫПОЛНЕНИИ FETCH:', fetchError);
+                    console.error(`⏱️ Время до ошибки: ${fetchDuration.toFixed(2)}мс`);
+                    console.error('📋 Детали ошибки:', {
+                        name: fetchError.name,
+                        message: fetchError.message,
+                        stack: fetchError.stack,
+                        isAbortError: fetchError.name === 'AbortError'
+                    });
+                    
+                    if (fetchError.name === 'AbortError') {
+                        console.error('❌ ЗАПРОС ПРЕРВАН: Превышен таймаут 120 секунд');
+                        container.innerHTML = `
+                            <div class="alert alert-danger">
+                                <strong>❌ Таймаут запроса</strong><br>
+                                Запрос к серверу превысил 120 секунд. Возможно, сервер обрабатывает слишком много данных (${allChats.length || 'много'} чатов).<br>
+                                <small>Попробуйте обновить страницу или подождите еще немного.</small><br>
+                                <button class="btn btn-sm btn-primary mt-2" onclick="refreshChats()">Повторить попытку</button>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    throw fetchError;
+                }
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`❌ Ошибка HTTP ${response.status}:`, errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                // JSON уже распарсен выше
+                console.log('📋 ШАГ 4: Данные получены и распарсены');
+                parseDuration = performance.now() - fetchStartTime; // Время на получение и парсинг
+                
+                console.log('📋 ШАГ 5: Анализ полученных данных...');
+                console.log('📊 СТРУКТУРА ДАННЫХ:', {
+                    hasGroups: Array.isArray(data.groups),
+                    groupsLength: data.groups?.length || 0,
+                    hasPersonalChats: Array.isArray(data.personalChats),
+                    personalChatsLength: data.personalChats?.length || 0,
+                    status: data.status,
+                    hasError: !!data.error,
+                    error: data.error,
+                    total: data.total,
+                    allKeys: Object.keys(data)
+                });
+                
+                // Дополнительная проверка данных
+                if (!data.groups && !data.personalChats) {
+                    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: В ответе нет массивов groups и personalChats');
+                    console.error('📋 ПОЛНЫЙ ОТВЕТ:', JSON.stringify(data, null, 2));
+                    console.error('📋 Тип данных:', typeof data);
+                    console.error('📋 Является ли массивом:', Array.isArray(data));
+                } else {
+                    console.log('✅ Массивы groups и personalChats присутствуют');
+                    if (data.groups && data.groups.length > 0) {
+                        console.log('📋 Первая группа:', data.groups[0]);
+                    }
+                    if (data.personalChats && data.personalChats.length > 0) {
+                        console.log('📋 Первый личный чат:', data.personalChats[0]);
+                    }
+                }
+                
+                // Проверяем статус подключения
+                if (data.error) {
+                    console.warn('⚠️ Ошибка от API:', data.error);
+                    container.innerHTML = `
+                        <div class="alert alert-warning">
+                            <strong>⚠️ ${escapeHtml(data.error)}</strong><br>
+                            <small>Статус: ${escapeHtml(data.status || 'unknown')}</small><br>
+                            <button class="btn btn-sm btn-primary mt-2" onclick="refreshChats()">Повторить попытку</button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                console.log('📋 ШАГ 6: Обработка групп...');
+                const groupsStartTime = performance.now();
+                const allGroups = (data.groups || []).map((chat, index) => {
+                    const result = {
+                        ...chat,
+                        type: 'group',
+                        selected: selectedChatIds.has(chat.id)
+                    };
+                    if (index < 3) {
+                        console.log(`   Группа ${index + 1}:`, result);
+                    }
+                    return result;
+                });
+                const groupsDuration = performance.now() - groupsStartTime;
+                console.log(`✅ Обработано групп: ${allGroups.length} за ${groupsDuration.toFixed(2)}мс`);
+                
+                console.log('📋 ШАГ 7: Обработка личных чатов...');
+                const personalStartTime = performance.now();
+                const allPersonal = (data.personalChats || []).map((chat, index) => {
+                    const result = {
+                        ...chat,
+                        type: 'personal',
+                        selected: selectedChatIds.has(chat.id)
+                    };
+                    if (index < 3) {
+                        console.log(`   Личный чат ${index + 1}:`, result);
+                    }
+                    return result;
+                });
+                const personalDuration = performance.now() - personalStartTime;
+                console.log(`✅ Обработано личных чатов: ${allPersonal.length} за ${personalDuration.toFixed(2)}мс`);
+                
+                console.log('📋 ШАГ 8: Объединение всех чатов...');
+                allChats = [...allGroups, ...allPersonal];
+                console.log(`✅ Всего чатов в allChats: ${allChats.length}`);
+                console.log(`📊 Распределение: Групп: ${allGroups.length}, Личных: ${allPersonal.length}`);
+                
+                if (allChats.length === 0) {
+                    console.warn('ℹ️ Чаты не найдены');
+                    container.innerHTML = `
+                        <div class="alert alert-info">
+                            <strong>ℹ️ Чаты не найдены</strong><br>
+                            <small>Статус: ${escapeHtml(data.status || 'unknown')}</small><br>
+                            <button class="btn btn-sm btn-primary mt-2" onclick="refreshChats()">Повторить попытку</button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                console.log('📋 ШАГ 9: Вызов displayChats()...');
+                const displayStartTime = performance.now();
+                displayChats();
+                const displayDuration = performance.now() - displayStartTime;
+                console.log(`✅ displayChats() выполнена за ${displayDuration.toFixed(2)}мс`);
+                
+                const totalDuration = performance.now() - startTime;
+                console.log('═'.repeat(80));
+                console.log('✅ ЗАГРУЗКА ЧАТОВ ЗАВЕРШЕНА УСПЕШНО');
+                console.log('═'.repeat(80));
+                console.log(`⏱️ Общее время: ${totalDuration.toFixed(2)}мс`);
+                console.log(`   - Запрос: ${fetchDuration.toFixed(2)}мс`);
+                console.log(`   - Парсинг: ${parseDuration.toFixed(2)}мс`);
+                console.log(`   - Обработка групп: ${groupsDuration.toFixed(2)}мс`);
+                console.log(`   - Обработка личных: ${personalDuration.toFixed(2)}мс`);
+                console.log(`   - Отображение: ${displayDuration.toFixed(2)}мс`);
+                console.log(`📊 Итого чатов: ${allChats.length} (Групп: ${allGroups.length}, Личных: ${allPersonal.length})`);
+                console.log('═'.repeat(80));
+            } catch (error) {
+                console.error('❌ Ошибка загрузки чатов:', error);
+                console.error('Stack trace:', error.stack);
+                const container = document.getElementById('chatsList');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>❌ Ошибка загрузки чатов</strong><br>
+                            ${escapeHtml(error.message)}<br>
+                            <button class="btn btn-sm btn-primary mt-2" onclick="refreshChats()">Повторить попытку</button>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // Отображение чатов
+        function displayChats() {
+            const displayStartTime = performance.now();
+            console.log('═'.repeat(80));
+            console.log('📝 НАЧАЛО ОТОБРАЖЕНИЯ ЧАТОВ');
+            console.log('═'.repeat(80));
+            try {
+                console.log(`📊 Всего чатов в allChats: ${allChats.length}`);
+                console.log(`📊 Тип allChats:`, Array.isArray(allChats) ? 'массив' : typeof allChats);
+                if (allChats.length > 0) {
+                    console.log(`📊 Первый чат:`, allChats[0]);
+                    console.log(`📊 Последний чат:`, allChats[allChats.length - 1]);
+                }
+                
+                const searchInput = document.getElementById('chatSearchInput');
+                const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+                console.log(`🔍 Поисковый запрос: "${searchTerm}"`);
+                
+                const filteredChats = allChats.filter(chat => {
+                    if (!chat || !chat.name) {
+                        console.warn('⚠️ Найден чат без имени:', chat);
+                        return false;
+                    }
+                    return chat.name.toLowerCase().includes(searchTerm);
+                });
+                console.log(`📋 Отфильтровано чатов: ${filteredChats.length}`);
+                
+                // Сортируем: выбранные сверху
+                const sortedChats = [
+                    ...filteredChats.filter(c => c.selected),
+                    ...filteredChats.filter(c => !c.selected)
+                ];
+                console.log(`📊 Отсортировано чатов: ${sortedChats.length} (выбрано: ${filteredChats.filter(c => c.selected).length})`);
+                
+                const container = document.getElementById('chatsList');
+                if (!container) {
+                    console.error('❌ Элемент chatsList не найден!');
+                    return;
+                }
+                
+                if (sortedChats.length === 0) {
+                    console.warn('ℹ️ Нет чатов для отображения');
+                    if (allChats.length === 0) {
+                        container.innerHTML = '<div class="text-center text-muted p-3">Чаты не найдены. Убедитесь, что WhatsApp клиент подключен и готов.</div>';
+                    } else {
+                        container.innerHTML = '<div class="text-center text-muted p-3">Чаты не найдены по запросу "' + escapeHtml(searchTerm) + '"</div>';
+                    }
+                    return;
+                }
+                
+                console.log('📋 ШАГ 1: Генерация HTML для чатов...');
+                console.log(`📊 Всего чатов для отображения: ${sortedChats.length}`);
+                console.log(`📊 Первые 3 чата для отладки:`, sortedChats.slice(0, 3));
+                
+                const htmlStartTime = performance.now();
+                const htmlContent = sortedChats.map((chat, index) => {
+                    if (index < 3) {
+                        console.log(`   Генерация HTML для чата ${index + 1}:`, {
+                            id: chat.id,
+                            name: chat.name,
+                            type: chat.type,
+                            selected: chat.selected
+                        });
+                    }
+                    try {
+                        const chatTypeBadge = chat.type === 'group' 
+                            ? '<span class="badge bg-primary me-2">Группа</span>' 
+                            : '<span class="badge bg-secondary me-2">Личный</span>';
+                        
+                        // Создаем безопасный ID для атрибута id
+                        const safeIdForAttr = String(chat.id).replace(/[^a-zA-Z0-9]/g, '_');
+                        
+                        // Экранируем ID для data-атрибута (используем HTML-экранирование)
+                        const escapedChatId = escapeHtml(String(chat.id));
+                        
+                        return `
+                        <div class="chat-item d-flex align-items-center p-2 border-bottom" style="cursor: pointer;">
+                            <div class="form-check me-3">
+                                <input class="form-check-input chat-checkbox" type="checkbox" 
+                                       ${chat.selected ? 'checked' : ''} 
+                                       data-chat-id="${escapedChatId}"
+                                       id="chat-${safeIdForAttr}">
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">${chatTypeBadge}${escapeHtml(chat.name)}</div>
+                                <small class="text-muted">${escapeHtml(chat.id)}</small>
+                                ${chat.unreadCount > 0 ? `<span class="badge bg-danger ms-2">${chat.unreadCount} непрочитанных</span>` : ''}
+                            </div>
+                            ${chat.selected ? '<span class="badge bg-success">Выбрано</span>' : ''}
+                        </div>
+                    `;
+                    } catch (chatError) {
+                        console.error(`❌ Ошибка генерации HTML для чата ${index}:`, chatError);
+                        return '';
+                    }
+                }).join('');
+                
+                const htmlDuration = performance.now() - htmlStartTime;
+                console.log(`✅ HTML сгенерирован за ${htmlDuration.toFixed(2)}мс`);
+                console.log(`📝 Размер HTML: ${htmlContent.length} символов`);
+                console.log(`📊 Количество элементов chat-item: ${(htmlContent.match(/chat-item/g) || []).length}`);
+                
+                console.log('📋 ШАГ 2: Вставка HTML в контейнер...');
+                const insertStartTime = performance.now();
+                container.innerHTML = htmlContent;
+                const insertDuration = performance.now() - insertStartTime;
+                console.log(`✅ HTML вставлен за ${insertDuration.toFixed(2)}мс`);
+                
+                // Добавляем обработчики событий для чекбоксов
+                console.log('📋 ШАГ 2.1: Добавление обработчиков событий для чекбоксов...');
+                const checkboxStartTime = performance.now();
+                const checkboxes = container.querySelectorAll('.chat-checkbox');
+                console.log(`📊 Найдено чекбоксов: ${checkboxes.length}`);
+                checkboxes.forEach(checkbox => {
+                    const chatId = checkbox.getAttribute('data-chat-id');
+                    if (chatId) {
+                        checkbox.addEventListener('change', function() {
+                            toggleChatSelection(chatId, this.checked);
+                        });
+                    }
+                });
+                const checkboxDuration = performance.now() - checkboxStartTime;
+                console.log(`✅ Обработчики добавлены за ${checkboxDuration.toFixed(2)}мс`);
+                
+                console.log('📋 ШАГ 3: Проверка результата...');
+                console.log(`📊 Контейнер chatsList после вставки:`, {
+                    innerHTMLLength: container.innerHTML.length,
+                    childrenCount: container.children.length,
+                    firstChild: container.firstElementChild ? {
+                        tagName: container.firstElementChild.tagName,
+                        className: container.firstElementChild.className,
+                        id: container.firstElementChild.id,
+                        innerText: container.firstElementChild.innerText?.substring(0, 50)
+                    } : 'нет',
+                    allChildren: Array.from(container.children).slice(0, 3).map(el => ({
+                        tagName: el.tagName,
+                        className: el.className
+                    }))
+                });
+                
+                const totalDisplayDuration = performance.now() - displayStartTime;
+                console.log('═'.repeat(80));
+                console.log('✅ ОТОБРАЖЕНИЕ ЧАТОВ ЗАВЕРШЕНО');
+                console.log('═'.repeat(80));
+                console.log(`⏱️ Общее время отображения: ${totalDisplayDuration.toFixed(2)}мс`);
+                console.log(`   - Генерация HTML: ${htmlDuration.toFixed(2)}мс`);
+                console.log(`   - Вставка HTML: ${insertDuration.toFixed(2)}мс`);
+                console.log(`📊 Отображено чатов: ${sortedChats.length}`);
+                console.log('═'.repeat(80));
+            } catch (error) {
+                console.error('❌ Ошибка в displayChats():', error);
+                console.error('Stack trace:', error.stack);
+                const container = document.getElementById('chatsList');
+                if (container) {
+                    container.innerHTML = `<div class="alert alert-danger">Ошибка отображения чатов: ${escapeHtml(error.message)}</div>`;
+                }
+            }
+        }
+
+        // Переключение выбора чата
+        function toggleChatSelection(chatId, selected) {
+            try {
+                // chatId уже приходит как строка из data-атрибута
+                const actualChatId = String(chatId);
+                
+                console.log(`🔄 Переключение выбора чата:`, {
+                    chatId: actualChatId,
+                    type: typeof actualChatId,
+                    selected: selected,
+                    currentSize: selectedChatIds.size
+                });
+                
+                if (selected) {
+                    selectedChatIds.add(actualChatId);
+                } else {
+                    selectedChatIds.delete(actualChatId);
+                }
+                
+                console.log(`📊 Размер selectedChatIds после изменения: ${selectedChatIds.size}`);
+                console.log(`📋 Выбранные ID:`, Array.from(selectedChatIds));
+                
+                // Ищем чат по ID (сравниваем как строки)
+                const chat = allChats.find(c => String(c.id) === String(actualChatId));
+                if (chat) {
+                    chat.selected = selected;
+                    console.log(`✅ Чат "${chat.name}" (${chat.type}) ${selected ? 'выбран' : 'снят с выбора'}`);
+                } else {
+                    console.warn(`⚠️ Чат с ID ${actualChatId} не найден в allChats`);
+                    console.warn(`📋 Доступные ID (первые 5):`, allChats.slice(0, 5).map(c => ({ id: c.id, type: typeof c.id })));
+                }
+                
+                displayChats();
+            } catch (error) {
+                console.error('❌ Ошибка в toggleChatSelection():', error);
+                console.error('Stack trace:', error.stack);
+            }
+        }
+
+        // Фильтрация чатов
+        function filterChats() {
+            displayChats();
+        }
+
+        // Загрузка промптов
+        async function loadPrompts() {
+            try {
+                console.log('📥 Загрузка промптов...');
+                const response = await fetch('/api/prompts');
+                
+                if (!response.ok) {
+                    console.warn(`⚠️ Ошибка загрузки промптов: HTTP ${response.status}`);
+                    availablePrompts = [];
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // Проверяем, что это массив
+                if (Array.isArray(data)) {
+                    availablePrompts = data;
+                    console.log(`✅ Загружено промптов: ${availablePrompts.length}`);
+                } else if (data.error) {
+                    console.warn(`⚠️ Ошибка от сервера при загрузке промптов: ${data.error}`);
+                    availablePrompts = [];
+                } else {
+                    availablePrompts = [];
+                    console.warn('⚠️ Неожиданный формат ответа от /api/prompts');
+                }
+            } catch (error) {
+                console.error('❌ Ошибка загрузки промптов:', error);
+                availablePrompts = [];
+            }
+        }
+
+        // Загрузка заданий
+        async function loadTasks() {
+            try {
+                const response = await fetch('/api/tasks');
+                const data = await response.json();
+                tasks = data.tasks || [];
+                displayTasks();
+            } catch (error) {
+                console.error('Ошибка загрузки заданий:', error);
+            }
+        }
+
+        // Отображение заданий
+        function displayTasks() {
+            const container = document.getElementById('tasksList');
+            if (tasks.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted p-3">Задания отсутствуют</div>';
+                return;
+            }
+            
+            container.innerHTML = tasks.map(task => {
+                const prompt = availablePrompts.find(p => p.id === task.promptId);
+                const promptName = prompt ? prompt.name : `ID: ${task.promptId}`;
+                const chatCount = task.chatIds ? task.chatIds.length : 0;
+                
+                return `
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">${escapeHtml(task.name)}</h6>
+                                    <small class="text-muted">
+                                        Промпт: ${escapeHtml(promptName)} | 
+                                        Групп: ${chatCount} | 
+                                        ${task.active ? '<span class="badge bg-success">Активно</span>' : '<span class="badge bg-secondary">Неактивно</span>'}
+                                    </small>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTask(${task.id})">
+                                        <i class="fe fe-trash-2"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Показать модальное окно добавления задания
+        function showAddTaskModal() {
+            console.log('📋 showAddTaskModal вызвана');
+            console.log('📊 selectedChatIds.size:', selectedChatIds.size);
+            console.log('📋 Выбранные ID:', Array.from(selectedChatIds));
+            
+            // Проверяем, что выбраны именно группы
+            const selectedGroups = allChats.filter(chat => 
+                selectedChatIds.has(chat.id) && chat.type === 'group'
+            );
+            
+            console.log('📊 Выбранные группы:', selectedGroups.length);
+            console.log('📋 Список выбранных групп:', selectedGroups.map(g => ({ id: g.id, name: g.name })));
+            
+            if (selectedChatIds.size === 0) {
+                alert('Выберите хотя бы одну группу');
+                return;
+            }
+            
+            if (selectedGroups.length === 0) {
+                alert('Выберите хотя бы одну группу (не личный чат)');
+                return;
+            }
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Добавить задание</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Название задания</label>
+                                <input type="text" class="form-control" id="taskNameInput" 
+                                       placeholder="Например: Мониторинг продаж">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Промпт для обработки</label>
+                                <select class="form-select" id="taskPromptSelect">
+                                    <option value="">Загрузка промптов...</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Выбранные группы (${selectedChatIds.size})</label>
+                                <div class="small text-muted">
+                                    ${Array.from(selectedChatIds).map(id => {
+                                        const chat = allChats.find(c => c.id === id);
+                                        return chat ? escapeHtml(chat.name) : id;
+                                    }).join(', ')}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                            <button type="button" class="btn btn-primary" onclick="createTask()">Создать</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            // Заполняем промпты
+            const select = modal.querySelector('#taskPromptSelect');
+            select.innerHTML = '<option value="">-- Выберите промпт --</option>';
+            availablePrompts.forEach(prompt => {
+                const option = document.createElement('option');
+                option.value = prompt.id;
+                option.textContent = `${prompt.name || 'Без названия'} (ID: ${prompt.id})`;
+                select.appendChild(option);
+            });
+            
+            modal.addEventListener('hidden.bs.modal', () => {
+                document.body.removeChild(modal);
+            });
+            
+            window.createTask = async function() {
+                console.log('📋 createTask вызвана');
+                console.log('📊 selectedChatIds.size:', selectedChatIds.size);
+                console.log('📋 Выбранные ID:', Array.from(selectedChatIds));
+                
+                // Фильтруем только группы
+                const selectedGroups = allChats.filter(chat => 
+                    selectedChatIds.has(chat.id) && chat.type === 'group'
+                );
+                
+                console.log('📊 Выбранные группы для задания:', selectedGroups.length);
+                console.log('📋 ID выбранных групп:', selectedGroups.map(g => g.id));
+                
+                if (selectedGroups.length === 0) {
+                    alert('Выберите хотя бы одну группу (не личный чат)');
+                    return;
+                }
+                
+                const name = document.getElementById('taskNameInput').value.trim() || `Задание ${Date.now()}`;
+                const promptId = parseInt(document.getElementById('taskPromptSelect').value);
+                
+                if (!promptId) {
+                    alert('Выберите промпт');
+                    return;
+                }
+                
+                const groupIds = selectedGroups.map(g => g.id);
+                console.log('📤 Отправка запроса на создание задания:', {
+                    name,
+                    promptId,
+                    chatIds: groupIds,
+                    chatIdsCount: groupIds.length
+                });
+                
+                try {
+                    const response = await fetch('/api/tasks', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name,
+                            promptId,
+                            chatIds: groupIds
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        bsModal.hide();
+                        loadTasks();
+                        selectedChatIds.clear();
+                        refreshChats();
+                    } else {
+                        alert('Ошибка создания задания: ' + (data.error || 'Неизвестная ошибка'));
+                    }
+                } catch (error) {
+                    alert('Ошибка создания задания: ' + error.message);
+                }
+            };
+        }
+
+        // Отправка тестового сообщения
+        function showTestMessageModal() {
+            console.log('📋 showTestMessageModal вызвана');
+            console.log('📊 selectedChatIds.size:', selectedChatIds.size);
+            console.log('📋 Выбранные ID:', Array.from(selectedChatIds));
+            
+            // Проверяем, что выбрана одна группа
+            const selectedGroups = allChats.filter(chat => 
+                selectedChatIds.has(chat.id) && chat.type === 'group'
+            );
+            
+            console.log('📊 Выбранные группы:', selectedGroups.length);
+            console.log('📋 Список выбранных групп:', selectedGroups.map(g => ({ id: g.id, name: g.name })));
+            
+            if (selectedGroups.length === 0) {
+                alert('Выберите одну группу для отправки тестового сообщения');
+                return;
+            }
+            
+            if (selectedGroups.length > 1) {
+                alert('Выберите только одну группу для отправки тестового сообщения');
+                return;
+            }
+            
+            const selectedGroup = selectedGroups[0];
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Отправить тестовое сообщение</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Группа</label>
+                                <input type="text" class="form-control" id="testMessageChatName" 
+                                       value="${escapeHtml(selectedGroup.name)}" readonly>
+                                <input type="hidden" id="testMessageChatId" value="${escapeHtml(selectedGroup.id)}">
+                                <small class="text-muted">ID: ${escapeHtml(selectedGroup.id)}</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Текст сообщения</label>
+                                <textarea class="form-control" id="testMessageContent" rows="5" 
+                                          placeholder="Введите текст тестового сообщения..."></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Имя отправителя (опционально)</label>
+                                <input type="text" class="form-control" id="testMessageSenderName" 
+                                       placeholder="Имя отправителя" value="Test User">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Телефон отправителя (опционально)</label>
+                                <input type="text" class="form-control" id="testMessageSenderPhone" 
+                                       placeholder="+79999999999" value="+79999999999">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Промпт (опционально)</label>
+                                <select class="form-select" id="testMessagePromptSelect">
+                                    <option value="">-- Использовать промпт из задания (если есть) --</option>
+                                </select>
+                                <small class="text-muted">Если не выбран, будет использован промпт из активного задания для группы</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                            <button type="button" class="btn btn-primary" onclick="sendTestMessage()">Отправить</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            // Заполняем промпты
+            const select = modal.querySelector('#testMessagePromptSelect');
+            availablePrompts.forEach(prompt => {
+                const option = document.createElement('option');
+                option.value = prompt.id;
+                option.textContent = `${prompt.name || 'Без названия'} (ID: ${prompt.id})`;
+                select.appendChild(option);
+            });
+            
+            modal.addEventListener('hidden.bs.modal', () => {
+                document.body.removeChild(modal);
+            });
+            
+            window.sendTestMessage = async function() {
+                const chatId = document.getElementById('testMessageChatId').value;
+                const chatName = document.getElementById('testMessageChatName').value;
+                const content = document.getElementById('testMessageContent').value.trim();
+                const senderName = document.getElementById('testMessageSenderName').value.trim() || 'Test User';
+                const senderPhone = document.getElementById('testMessageSenderPhone').value.trim() || '+79999999999';
+                const promptId = document.getElementById('testMessagePromptSelect').value ? 
+                    parseInt(document.getElementById('testMessagePromptSelect').value) : null;
+                
+                if (!content) {
+                    alert('Введите текст сообщения');
+                    return;
+                }
+                
+                console.log('📤 Отправка тестового сообщения:', {
+                    chatId,
+                    chatName,
+                    content: content.substring(0, 50) + '...',
+                    senderName,
+                    senderPhone,
+                    promptId
+                });
+                
+                const sendButton = modal.querySelector('button[onclick="sendTestMessage()"]');
+                const originalText = sendButton.innerHTML;
+                sendButton.disabled = true;
+                sendButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Отправка...';
+                
+                try {
+                    const response = await fetch('/api/test-message', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chatId: chatId,
+                            chatName: chatName,
+                            content: content,
+                            senderName: senderName,
+                            senderPhone: senderPhone,
+                            isGroup: true,
+                            promptId: promptId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (response.ok && data.success) {
+                        bsModal.hide();
+                        alert('✅ Тестовое сообщение успешно отправлено!\n\nПроверьте логи сервера для деталей обработки.');
+                    } else {
+                        alert('❌ Ошибка отправки тестового сообщения: ' + (data.error || 'Неизвестная ошибка'));
+                    }
+                } catch (error) {
+                    console.error('❌ Ошибка отправки тестового сообщения:', error);
+                    alert('❌ Ошибка отправки тестового сообщения: ' + error.message);
+                } finally {
+                    sendButton.disabled = false;
+                    sendButton.innerHTML = originalText;
+                }
+            };
+        }
+
+        // Удаление задания
+        async function deleteTask(taskId) {
+            if (!confirm('Удалить задание?')) return;
+            
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    loadTasks();
+                } else {
+                    alert('Ошибка удаления задания');
+                }
+            } catch (error) {
+                alert('Ошибка удаления задания: ' + error.message);
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 Инициализация страницы chats.html...');
+            
+            // Статус WhatsApp обновляется автоматически через whatsapp-status.js
+            // Просто вызываем refreshWhatsAppStatus если нужно обновить вручную
+            if (typeof window.refreshWhatsAppStatus === 'function') {
+                await window.refreshWhatsAppStatus();
+            }
+            
+            // Загружаем промпты и задания параллельно, не блокируя загрузку чатов
+            Promise.all([
+                loadPrompts().catch(err => console.error('Ошибка загрузки промптов:', err)),
+                loadTasks().catch(err => console.error('Ошибка загрузки заданий:', err))
+            ]).then(() => {
+                console.log('✅ Промпты и задания загружены');
+            });
+            
+            // Загружаем чаты сразу, не дожидаясь промптов
+            await refreshChats();
+            
+            console.log('✅ Инициализация страницы chats.html завершена');
+        });
+    </script>
+    <style>
+        /* Увеличение ширины элементов */
+        .card.custom-card {
+            width: 100%;
+            min-width: 100%;
+        }
+        .card-body {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+        #chatsList {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+        .chat-item {
+            width: 100% !important;
+            min-width: 100% !important;
+            padding: 12px !important;
+        }
+        .chat-item .flex-grow-1 {
+            min-width: 0;
+            flex: 1 1 auto;
+            width: 100%;
+        }
+        #tasksList {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+        .task-item {
+            width: 100% !important;
+            min-width: 100% !important;
+            padding: 12px !important;
+        }
+        .row {
+            width: 100%;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .col-xl-12 {
+            width: 100%;
+            padding-left: 15px;
+            padding-right: 15px;
+        }
+        
+        .chat-item:hover {
+            background-color: #f8f9fa;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+
+</html>

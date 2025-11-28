@@ -4,7 +4,7 @@ dotenv.config();
 
 export const config = {
   // Spring Boot API endpoint
-  apiUrl: process.env.API_URL || 'http://localhost:8080',
+  apiUrl: process.env.API_URL || 'https://minerhive.ru',
   apiEndpoint: process.env.API_ENDPOINT || '/api/webhook/whatsapp',
   
   // API ключ для авторизации (опционально)

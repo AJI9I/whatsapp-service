@@ -29,7 +29,7 @@ cp env.example .env
 
 3. Настройте `.env` файл:
 ```env
-API_URL=http://localhost:8080
+API_URL=http://localhost:8050
 API_ENDPOINT=/api/webhook/whatsapp
 MONITORED_GROUPS=120363123456789@g.us,Продажа ASIC
 LOG_LEVEL=info
@@ -81,7 +81,7 @@ http://localhost:3000
 
 ### Переменные окружения (опционально, для начальной конфигурации)
 
-- `API_URL` - URL Spring Boot приложения (по умолчанию: `http://localhost:8080`)
+- `API_URL` - URL Spring Boot приложения (по умолчанию: `http://localhost:8050`)
 - `API_ENDPOINT` - Endpoint для отправки сообщений (по умолчанию: `/api/webhook/whatsapp`)
 - `API_KEY` - Опциональный API ключ для авторизации
 - `SESSION_PATH` - Путь для сохранения сессии (по умолчанию: `./.wwebjs_auth`)

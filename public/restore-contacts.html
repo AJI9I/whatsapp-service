@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr" data-nav-layout="vertical" data-theme-mode="light" data-header-styles="light" data-menu-styles="light" data-toggled="open">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Восстановление контактов - WhatsApp Service</title>
+    <meta name="Description" content="Восстановление информации о контактах из WhatsApp API">
+    
+    <link rel="icon" href="/bootstrap-theme/assets/images/brand-logos/favicon.ico" type="image/x-icon">
+    <link id="style" href="/bootstrap-theme/assets/libs/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/bootstrap-theme/assets/css/styles.min.css" rel="stylesheet">
+    <link href="/bootstrap-theme/assets/css/icons.css" rel="stylesheet">
+    <link href="/bootstrap-theme/assets/libs/node-waves/waves.min.css" rel="stylesheet">
+    <link href="/bootstrap-theme/assets/libs/simplebar/simplebar.min.css" rel="stylesheet">
+    
+    <!-- Общее меню -->
+    <script src="/menu.js"></script>
+    
+    <style>
+        .app-sidebar {
+            display: block !important;
+            visibility: visible !important;
+        }
+        .main-menu {
+            display: block !important;
+        }
+        .side-menu__item {
+            display: flex !important;
+            align-items: center !important;
+            padding: 0.75rem 1.25rem !important;
+            color: #495057 !important;
+            text-decoration: none !important;
+        }
+        .side-menu__item:hover {
+            background-color: #f8f9fa !important;
+        }
+        .side-menu__item.active {
+            background-color: #e7f1ff !important;
+            color: #0d6efd !important;
+        }
+        .side-menu__icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.75rem;
+            fill: currentColor;
+        }
+        .side-menu__label {
+            display: block !important;
+        }
+        .restore-logs-container {
+            height: 500px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .log-entry {
+            margin-bottom: 3px;
+            line-height: 1.4;
+        }
+        .log-level-info { color: #4ec9b0; }
+        .log-level-warn { color: #dcdcaa; }
+        .log-level-error { color: #f48771; }
+        .log-level-debug { color: #569cd6; }
+        .log-timestamp {
+            color: #858585;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <header class="app-header">
+            <div class="main-header-container container-fluid">
+                <div class="header-content-left">
+                    <div class="header-element">
+                        <a aria-label="Toggle Sidebar" class="sidemenu-toggle header-link animated-arrow hor-toggle horizontal-navtoggle" data-bs-toggle="sidebar" href="javascript:void(0);">
+                            <i class="header-icon fe fe-align-left"></i>
+                        </a>
+                    </div>
+                    <div class="header-element">
+                        <div class="horizontal-logo">
+                            <a href="/" class="header-logo">
+                                <span class="desktop-logo">📱 WhatsApp Service</span>
+                                <span class="toggle-logo">WhatsApp</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-content-right">
+                    <div class="header-element">
+                        <span class="badge bg-success" id="serviceStatusBadge">Проверка...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <aside class="app-sidebar sticky" id="sidebar">
+            <div class="main-sidebar-header">
+                <a href="/" class="header-logo">
+                    <span class="desktop-logo">📱 WhatsApp</span>
+                    <span class="toggle-logo">WA</span>
+                </a>
+            </div>
+            <div class="main-sidebar" id="sidebar-scroll">
+                <nav class="main-menu-container nav nav-pills flex-column sub-open">
+                    <ul class="main-menu" id="main-menu">
+                        <!-- Меню будет вставлено автоматически через menu.js -->
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+
+        <div class="main-content app-content">
+            <div class="container-fluid">
+                <div class="d-md-flex d-block align-items-center justify-content-between my-4 page-header-breadcrumb">
+                    <div class="my-auto">
+                        <h5 class="page-title fs-21 mb-1">Восстановление контактов</h5>
+                        <nav>
+                            <ol class="breadcrumb mb-0">
+                                <li class="breadcrumb-item"><a href="/">Главная</a></li>
+                                <li class="breadcrumb-item active" aria-current="page">Восстановление</li>
+                            </ol>
+                        </nav>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-xl-12">
+                        <div class="card custom-card">
+                            <div class="card-header justify-content-between">
+                                <div class="card-title">
+                                    <i class="fe fe-refresh-cw me-2"></i>Восстановление информации о контактах
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-secondary me-2" onclick="clearLogs()">
+                                        <i class="fe fe-trash-2 me-1"></i> Очистить логи
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="refreshLogs()">
+                                        <i class="fe fe-refresh-cw me-1"></i> Обновить
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <ul class="nav nav-tabs mb-3" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="offers-tab" data-bs-toggle="tab" data-bs-target="#offers-pane" type="button" role="tab">
+                                            <i class="fe fe-list me-1"></i> Предложения для восстановления
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="mass-restore-tab" data-bs-toggle="tab" data-bs-target="#mass-restore-pane" type="button" role="tab">
+                                            <i class="fe fe-play me-1"></i> Массовое восстановление
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs-pane" type="button" role="tab">
+                                            <i class="fe fe-file-text me-1"></i> Логи
+                                        </button>
+                                    </li>
+                                </ul>
+
+                                <div class="tab-content">
+                                    <!-- Вкладка: Предложения -->
+                                    <div class="tab-pane fade show active" id="offers-pane" role="tabpanel">
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <div>
+                                                    <button class="btn btn-sm btn-primary me-2" onclick="loadOffers()">
+                                                        <i class="fe fe-refresh-cw me-1"></i> Обновить список
+                                                    </button>
+                                                    <button class="btn btn-sm btn-success" onclick="restoreSelected()" id="restoreSelectedBtn" disabled>
+                                                        <i class="fe fe-check me-1"></i> Восстановить выбранные
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary ms-2" onclick="selectAll()">
+                                                        <i class="fe fe-check-square me-1"></i> Выбрать все
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary" onclick="deselectAll()">
+                                                        <i class="fe fe-square me-1"></i> Снять выбор
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-info ms-2" onclick="showFindContactModal()" title="Найти контакт в группах">
+                                                        <i class="fe fe-search me-1"></i> Найти в группах
+                                                    </button>
+                                                </div>
+                                                <div>
+                                                    <span class="badge bg-info" id="offersCount">Загрузка...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                            <table class="table table-hover">
+                                                <thead class="table-light sticky-top">
+                                                    <tr>
+                                                        <th width="40">
+                                                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                                                        </th>
+                                                        <th>ID</th>
+                                                        <th>Продавец (текущее)</th>
+                                                        <th>Телефон (текущий)</th>
+                                                        <th>Тип</th>
+                                                        <th>Цена</th>
+                                                        <th>Количество</th>
+                                                        <th>Чат</th>
+                                                        <th>Дата</th>
+                                                    <th>Действия</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="offersTableBody">
+                                                <tr>
+                                                    <td colspan="10" class="text-center text-muted py-4">
+                                                        <span class="spinner-border spinner-border-sm me-2"></span>Загрузка предложений...
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Модальное окно для поиска контакта в группах -->
+                                    <div class="modal fade" id="findContactModal" tabindex="-1" aria-labelledby="findContactModalLabel" aria-hidden="true">
+                                        <div class="modal-dialog modal-lg">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="findContactModalLabel">
+                                                        <i class="fe fe-search me-2"></i>Поиск контакта в группах
+                                                    </h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label for="searchContactId" class="form-label">WhatsApp ID для поиска</label>
+                                                        <input type="text" class="form-control" id="searchContactId" 
+                                                               placeholder="120363046456598557 или 120363046456598557@c.us">
+                                                        <small class="text-muted">Введите ID контакта для поиска в участниках всех групп</small>
+                                                    </div>
+                                                    <button class="btn btn-primary" onclick="findContactInGroups()">
+                                                        <i class="fe fe-search me-1"></i> Найти
+                                                    </button>
+                                                    
+                                                    <div id="findContactResults" class="mt-4" style="display: none;">
+                                                        <h6>Результаты поиска:</h6>
+                                                        <div id="findContactResultsContent"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                    <!-- Вкладка: Массовое восстановление -->
+                                    <div class="tab-pane fade" id="mass-restore-pane" role="tabpanel">
+                                        <div class="mb-4">
+                                            <p class="text-muted mb-3">
+                                                Восстановление достоверной информации о номерах телефонов и именах отправителей из WhatsApp API.
+                                                Утилита находит записи с WhatsApp ID вместо нормальных данных и обновляет их.
+                                            </p>
+                                            <div class="row">
+                                                <div class="col-md-4 mb-3">
+                                                    <label class="form-label">Тип восстановления</label>
+                                                    <select class="form-select" id="restoreType">
+                                                        <option value="all">Все (продавцы + предложения)</option>
+                                                        <option value="sellers">Только продавцы</option>
+                                                        <option value="offers">Только предложения</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-8 mb-3 d-flex align-items-end">
+                                                    <button class="btn btn-primary" onclick="startRestore()" id="restoreBtn">
+                                                        <i class="fe fe-play me-1"></i> Запустить восстановление
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Вкладка: Логи -->
+                                    <div class="tab-pane fade" id="logs-pane" role="tabpanel">
+                                        <div class="restore-logs-container" id="restoreLogsContainer">
+                                            <div class="text-muted">Логи восстановления появятся здесь...</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer mt-auto py-4 bg-white">
+            <div class="container-fluid">
+                <div class="text-center">
+                    <span class="text-muted">WhatsApp Service &copy; 2025</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/bootstrap-theme/assets/libs/@popperjs/core/umd/popper.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/node-waves/waves.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/simplebar/simplebar.min.js"></script>
+    
+    <!-- Компонент статуса WhatsApp -->
+    <script src="/whatsapp-status.js"></script>
+    
+    <script>
+        let logRefreshInterval = null;
+        let isRestoring = false;
+        let offersList = [];
+        let selectedOffers = new Set();
+
+        // Загрузка при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOffers();
+            refreshLogs();
+            
+            // Отслеживание прокрутки логов пользователем
+            const logsContainer = document.getElementById('restoreLogsContainer');
+            if (logsContainer) {
+                logsContainer.addEventListener('scroll', function() {
+                    isUserScrollingLogs = true;
+                    
+                    // Сбрасываем таймер
+                    if (logsScrollTimeout) {
+                        clearTimeout(logsScrollTimeout);
+                    }
+                    
+                    // Через 1 секунду после окончания прокрутки считаем, что пользователь закончил
+                    logsScrollTimeout = setTimeout(function() {
+                        isUserScrollingLogs = false;
+                    }, 1000);
+                });
+            }
+            
+            // Автообновление логов каждые 2 секунды
+            logRefreshInterval = setInterval(refreshLogs, 2000);
+        });
+
+        // Очистка интервала при закрытии страницы
+        window.addEventListener('beforeunload', function() {
+            if (logRefreshInterval) {
+                clearInterval(logRefreshInterval);
+            }
+        });
+
+        async function refreshLogs() {
+            try {
+                const response = await fetch('/api/restore-contacts/logs');
+                const data = await response.json();
+                displayLogs(data.logs || []);
+            } catch (error) {
+                console.error('Ошибка получения логов:', error);
+            }
+        }
+
+        let isUserScrollingLogs = false;
+        let logsScrollTimeout = null;
+
+        function displayLogs(logs) {
+            const container = document.getElementById('restoreLogsContainer');
+            if (!container) return;
+
+            // Сохраняем текущую позицию прокрутки перед обновлением
+            const currentScrollTop = container.scrollTop;
+            const scrollHeight = container.scrollHeight;
+            const clientHeight = container.clientHeight;
+            const isScrolledToBottom = (scrollHeight - clientHeight - currentScrollTop) < 10; // Допуск 10px
+
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="text-muted">Логи восстановления появятся здесь...</div>';
+                return;
+            }
+
+            let html = '';
+            logs.forEach(log => {
+                const timestamp = new Date(log.timestamp).toLocaleTimeString('ru-RU');
+                const levelClass = `log-level-${log.level}`;
+                html += `<div class="log-entry">
+                    <span class="log-timestamp">[${timestamp}]</span>
+                    <span class="${levelClass}">[${log.level.toUpperCase()}]</span>
+                    <span class="log-message">${escapeHtml(log.message)}</span>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+
+            // Прокручиваем только если пользователь был внизу и не скроллит
+            if (!isUserScrollingLogs && isScrolledToBottom) {
+                // Пользователь был внизу - прокручиваем к новым логам
+                container.scrollTop = container.scrollHeight;
+            } else if (!isUserScrollingLogs) {
+                // Пользователь не скроллил, но был не внизу - сохраняем позицию
+                container.scrollTop = currentScrollTop;
+            }
+            // Если пользователь скроллит - не трогаем позицию
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function startRestore() {
+            if (isRestoring) {
+                alert('Восстановление уже выполняется. Дождитесь завершения.');
+                return;
+            }
+
+            const type = document.getElementById('restoreType').value;
+            const btn = document.getElementById('restoreBtn');
+            
+            isRestoring = true;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Запуск...';
+
+            try {
+                const response = await fetch('/api/restore-contacts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ type })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Восстановление запущено! Следите за логами ниже.');
+                } else {
+                    alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                }
+            } catch (error) {
+                alert('Ошибка запуска восстановления: ' + error.message);
+            } finally {
+                isRestoring = false;
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fe fe-play me-1"></i> Запустить восстановление';
+            }
+        }
+
+        async function clearLogs() {
+            if (!confirm('Очистить все логи восстановления?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/restore-contacts/logs/clear', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    refreshLogs();
+                } else {
+                    alert('Ошибка очистки логов');
+                }
+            } catch (error) {
+                alert('Ошибка очистки логов: ' + error.message);
+            }
+        }
+
+        // Функции для работы с предложениями
+        async function loadOffers() {
+            const tbody = document.getElementById('offersTableBody');
+            const countBadge = document.getElementById('offersCount');
+            
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Загрузка предложений...</td></tr>';
+            
+            try {
+                const response = await fetch('/api/restore-contacts/offers?limit=1000');
+                const data = await response.json();
+                
+                offersList = data.offers || [];
+                countBadge.textContent = `Найдено: ${offersList.length}`;
+                
+                if (offersList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Нет предложений для восстановления</td></tr>';
+                    return;
+                }
+                
+                displayOffers(offersList);
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-4">Ошибка загрузки: ${error.message}</td></tr>`;
+                console.error('Ошибка загрузки предложений:', error);
+            }
+        }
+
+        function displayOffers(offers) {
+            const tbody = document.getElementById('offersTableBody');
+            selectedOffers.clear();
+            updateRestoreButton();
+            
+            if (offers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Нет предложений для восстановления</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            offers.forEach(offer => {
+                const whatsappId = isWhatsAppId(offer.seller_name) ? offer.seller_name : 
+                                  (isWhatsAppId(offer.seller_phone) ? offer.seller_phone : '');
+                const date = new Date(offer.created_at).toLocaleString('ru-RU');
+                
+                html += `<tr id="offer-row-${offer.id}">
+                    <td>
+                        <input type="checkbox" class="offer-checkbox" value="${offer.id}" onchange="toggleOffer(${offer.id})">
+                    </td>
+                    <td>${offer.id}</td>
+                    <td><code>${escapeHtml(offer.seller_name || '')}</code></td>
+                    <td><code>${escapeHtml(offer.seller_phone || '')}</code></td>
+                    <td><span class="badge ${offer.operation_type === 'SELL' ? 'bg-success' : 'bg-info'}">${offer.operation_type || ''}</span></td>
+                    <td>${offer.price ? offer.price.toLocaleString('ru-RU') : '-'}</td>
+                    <td>${offer.quantity || '-'}</td>
+                    <td><small>${escapeHtml(offer.source_chat_name || '')}</small></td>
+                    <td><small>${date}</small></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="restoreSingle(${offer.id})" title="Восстановить это предложение">
+                            <i class="fe fe-refresh-cw"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            });
+            
+            tbody.innerHTML = html;
+        }
+
+        function isWhatsAppId(str) {
+            if (!str || typeof str !== 'string') return false;
+            const cleaned = str.trim();
+            return (cleaned.length > 12 && /^\d+$/.test(cleaned)) || 
+                   (cleaned.includes('@') && cleaned.length > 15);
+        }
+
+        function toggleOffer(offerId) {
+            const checkbox = document.querySelector(`.offer-checkbox[value="${offerId}"]`);
+            if (checkbox.checked) {
+                selectedOffers.add(offerId);
+            } else {
+                selectedOffers.delete(offerId);
+            }
+            updateRestoreButton();
+            updateSelectAllCheckbox();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAllCheckbox').checked;
+            document.querySelectorAll('.offer-checkbox').forEach(cb => {
+                cb.checked = selectAll;
+                const offerId = parseInt(cb.value);
+                if (selectAll) {
+                    selectedOffers.add(offerId);
+                } else {
+                    selectedOffers.delete(offerId);
+                }
+            });
+            updateRestoreButton();
+        }
+
+        function selectAll() {
+            document.getElementById('selectAllCheckbox').checked = true;
+            toggleSelectAll();
+        }
+
+        function deselectAll() {
+            document.getElementById('selectAllCheckbox').checked = false;
+            toggleSelectAll();
+        }
+
+        function updateSelectAllCheckbox() {
+            const checkboxes = document.querySelectorAll('.offer-checkbox');
+            const checked = document.querySelectorAll('.offer-checkbox:checked');
+            document.getElementById('selectAllCheckbox').checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+        }
+
+        function updateRestoreButton() {
+            const btn = document.getElementById('restoreSelectedBtn');
+            btn.disabled = selectedOffers.size === 0;
+            btn.textContent = selectedOffers.size > 0 ? 
+                `Восстановить выбранные (${selectedOffers.size})` : 
+                'Восстановить выбранные';
+        }
+
+        async function restoreSelected() {
+            if (selectedOffers.size === 0) {
+                alert('Выберите предложения для восстановления');
+                return;
+            }
+
+            if (!confirm(`Восстановить ${selectedOffers.size} выбранных предложений?`)) {
+                return;
+            }
+
+            const offerIds = Array.from(selectedOffers);
+            let success = 0;
+            let failed = 0;
+
+            for (const offerId of offerIds) {
+                try {
+                    await restoreSingle(offerId, false);
+                    success++;
+                } catch (error) {
+                    failed++;
+                    console.error(`Ошибка восстановления предложения ${offerId}:`, error);
+                }
+            }
+
+            alert(`Восстановление завершено!\nУспешно: ${success}\nОшибок: ${failed}`);
+            selectedOffers.clear();
+            await loadOffers();
+        }
+
+        async function restoreSingle(offerId, showAlert = true) {
+            const row = document.getElementById(`offer-row-${offerId}`);
+            if (row) {
+                const btn = row.querySelector('button');
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                
+                try {
+                    const response = await fetch(`/api/restore-contacts/offers/${offerId}`, {
+                        method: 'POST'
+                    });
+
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        if (showAlert) {
+                            const message = data.result.partial 
+                                ? `Предложение ID=${offerId} частично восстановлено!\nТелефон: "${data.result.oldPhone}" → "${data.result.newPhone}"\nИмя: не найдено`
+                                : `Предложение ID=${offerId} успешно восстановлено!\n"${data.result.oldName}" → "${data.result.newName}"\n"${data.result.oldPhone}" → "${data.result.newPhone}"`;
+                            alert(message);
+                        }
+                        btn.innerHTML = '<i class="fe fe-check text-success"></i>';
+                        setTimeout(() => {
+                            loadOffers();
+                        }, 1000);
+                    } else {
+                        throw new Error(data.error || 'Неизвестная ошибка');
+                    }
+                } catch (error) {
+                    btn.innerHTML = '<i class="fe fe-x text-danger"></i>';
+                    if (showAlert) {
+                        alert(`Ошибка восстановления предложения ID=${offerId}: ${error.message}`);
+                    }
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }, 2000);
+                }
+            }
+        }
+
+        // Функции для поиска контакта в группах
+        function showFindContactModal() {
+            const modal = new bootstrap.Modal(document.getElementById('findContactModal'));
+            modal.show();
+        }
+
+        function findContactById(contactId) {
+            document.getElementById('searchContactId').value = contactId;
+            showFindContactModal();
+            // Автоматически запускаем поиск
+            setTimeout(() => findContactInGroups(), 500);
+        }
+
+        async function findContactInGroups() {
+            const contactId = document.getElementById('searchContactId').value.trim();
+            if (!contactId) {
+                alert('Введите WhatsApp ID для поиска');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('findContactResults');
+            const resultsContent = document.getElementById('findContactResultsContent');
+            
+            resultsDiv.style.display = 'block';
+            resultsContent.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>Поиск...</div>';
+
+            try {
+                const response = await fetch(`/api/find-contact/${encodeURIComponent(contactId)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Ошибка поиска');
+                }
+
+                let html = '';
+                
+                if (data.found) {
+                    html += `<div class="alert alert-success">
+                        <strong>✅ Контакт найден!</strong> Найден в ${data.foundIn.length} группе(ах)
+                    </div>`;
+                    
+                    data.foundIn.forEach((item, index) => {
+                        html += `<div class="card mb-2">
+                            <div class="card-body">
+                                <h6 class="card-title">Группа ${index + 1}: ${escapeHtml(item.chatName)}</h6>
+                                <p class="mb-1"><strong>ID контакта:</strong> <code>${escapeHtml(item.contact.id)}</code></p>
+                                <p class="mb-1"><strong>User ID:</strong> <code>${escapeHtml(item.contact.userId)}</code></p>
+                                <p class="mb-1"><strong>Номер:</strong> <code>${escapeHtml(item.contact.number)}</code></p>
+                                <p class="mb-1"><strong>Имя:</strong> ${escapeHtml(item.contact.name || 'не указано')}</p>
+                                <p class="mb-0"><strong>Pushname:</strong> ${escapeHtml(item.contact.pushname || 'не указано')}</p>
+                            </div>
+                        </div>`;
+                    });
+                } else {
+                    html += `<div class="alert alert-warning">
+                        <strong>⚠️ Контакт не найден</strong> в участниках групп
+                    </div>`;
+                    html += `<p>Искали: <code>${escapeHtml(contactId)}</code></p>`;
+                    html += `<p>User ID: <code>${escapeHtml(data.userId)}</code></p>`;
+                    html += `<p>Formatted ID: <code>${escapeHtml(data.formattedId)}</code></p>`;
+                }
+
+                html += `<div class="mt-3">
+                    <h6>Всего групп проверено: ${data.totalGroups}</h6>
+                    <details>
+                        <summary>Список всех групп</summary>
+                        <ul class="mt-2">`;
+                
+                data.allGroups.forEach(group => {
+                    html += `<li>${escapeHtml(group.chatName)} (${group.participantCount} участников)</li>`;
+                });
+                
+                html += `</ul></details></div>`;
+
+                resultsContent.innerHTML = html;
+
+            } catch (error) {
+                resultsContent.innerHTML = `<div class="alert alert-danger">Ошибка поиска: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
+

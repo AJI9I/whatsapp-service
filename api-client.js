@@ -1,6 +1,81 @@
 import axios from 'axios';
 import { config } from './config.js';
 import { logger } from './logger.js';
+import { logSentMessage } from './messages-logger.js'; // Импортируем логгер отправленных сообщений
+
+/**
+ * Отправляет данные сообщения в несколько API одновременно
+ * @param {Object} messageData - Данные сообщения
+ * @param {Array<{url: string, endpoint?: string, apiKey?: string}>} apiTargets - Массив целей для отправки
+ * @returns {Promise<Array<{url: string, success: boolean, response?: any, error?: string}>>}
+ */
+export async function sendToMultipleAPIs(messageData, apiTargets) {
+  logger.info(`🌐 Отправка сообщения в ${apiTargets.length} API одновременно`);
+  
+  // Детальное логирование данных об отправителе перед отправкой
+  logger.info('═'.repeat(80));
+  logger.info('📤 ДАННЫЕ ОБ ОТПРАВИТЕЛЕ ПЕРЕД ОТПРАВКОЙ В SPRING BOOT:');
+  logger.info('═'.repeat(80));
+  logger.info(`   senderId: "${messageData.senderId || 'NULL/undefined'}"`);
+  logger.info(`   senderName: "${messageData.senderName || 'NULL/undefined'}"`);
+  logger.info(`   senderPhoneNumber: "${messageData.senderPhoneNumber || 'NULL/undefined'}"`);
+  logger.info(`   chatName: "${messageData.chatName || 'NULL/undefined'}"`);
+  logger.info(`   messageId: "${messageData.messageId || 'NULL/undefined'}"`);
+  
+  // Проверяем, не являются ли senderName и senderPhoneNumber WhatsApp ID
+  if (messageData.senderName && messageData.senderName.length > 15 && /^[0-9]+$/.test(messageData.senderName)) {
+    logger.warn(`⚠️  ВНИМАНИЕ: senderName похож на WhatsApp ID, а не на имя: "${messageData.senderName}"`);
+  }
+  if (messageData.senderPhoneNumber && (messageData.senderPhoneNumber.length > 15 || messageData.senderPhoneNumber.includes('@') || messageData.senderPhoneNumber.includes('_'))) {
+    logger.warn(`⚠️  ВНИМАНИЕ: senderPhoneNumber похож на WhatsApp ID, а не на номер телефона: "${messageData.senderPhoneNumber}"`);
+  }
+  logger.info('═'.repeat(80));
+  
+  const promises = apiTargets.map(async (target) => {
+    const url = `${target.url}${target.endpoint || config.apiEndpoint}`;
+    const apiKey = target.apiKey || config.apiKey;
+    
+    try {
+      const headers = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8'
+      };
+      
+      if (apiKey) {
+        headers['X-API-Key'] = apiKey;
+      }
+      
+      logger.info(`📤 Отправка в: ${url}`);
+      
+      const response = await axios.post(url, messageData, {
+        headers: headers,
+        timeout: 10000,
+        responseEncoding: 'utf8',
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      });
+      
+      logger.info(`✅ Успешно отправлено в: ${url} (статус: ${response.status})`);
+      
+      // Логируем отправленное сообщение на бэкенд (в текстовый файл)
+      logSentMessage(messageData, url, true, response.data);
+      
+      return { url, success: true, response: response.data };
+    } catch (error) {
+      const errorMessage = error.response 
+        ? `HTTP ${error.response.status}: ${error.message}`
+        : error.message;
+      logger.error(`❌ Ошибка отправки в ${url}: ${errorMessage}`);
+      
+      // Логируем ошибку отправки
+      logSentMessage(messageData, url, false, null, errorMessage);
+      
+      return { url, success: false, error: errorMessage };
+    }
+  });
+  
+  return Promise.all(promises);
+}
 
 /**
  * Отправляет данные сообщения в API

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr" data-nav-layout="vertical" data-theme-mode="light" data-header-styles="light" data-menu-styles="light" data-toggled="open">
+
+<head>
+    <!-- Meta Data -->
+    <meta charset="UTF-8">
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Сообщения - WhatsApp Service</title>
+    <meta name="Description" content="История обработанных сообщений WhatsApp">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="/bootstrap-theme/assets/images/brand-logos/favicon.ico" type="image/x-icon">
+    
+    <!-- Bootstrap Css -->
+    <link id="style" href="/bootstrap-theme/assets/libs/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Style Css -->
+    <link href="/bootstrap-theme/assets/css/styles.min.css" rel="stylesheet">
+    
+    <!-- Icons Css -->
+    <link href="/bootstrap-theme/assets/css/icons.css" rel="stylesheet">
+    
+    <!-- Node Waves Css -->
+    <link href="/bootstrap-theme/assets/libs/node-waves/waves.min.css" rel="stylesheet">
+    
+    <!-- Simplebar Css -->
+    <link href="/bootstrap-theme/assets/libs/simplebar/simplebar.min.css" rel="stylesheet">
+    
+    <!-- Общее меню -->
+    <script src="/menu.js"></script>
+    
+    <!-- Компонент статуса WhatsApp -->
+    <script src="/whatsapp-status.js"></script>
+    
+    <!-- Fix for missing DOM elements - MUST be before other scripts -->
+    <script>
+        // Global error handler to prevent script errors from breaking the page
+        window.addEventListener('error', function(e) {
+            const errorMessage = e.message || '';
+            const errorFilename = e.filename || '';
+            
+            if (errorMessage.includes('Cannot read properties of null') ||
+                errorMessage.includes('classList') ||
+                errorMessage.includes('addEventListener') ||
+                errorMessage.includes('appendChild') ||
+                errorFilename.includes('defaultmenu.min.js') ||
+                errorFilename.includes('custom-switcher.min.js') ||
+                errorFilename.includes('custom.js')) {
+                // Подавляем ошибку без вывода в консоль для чистоты
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+            }
+        }, true);
+        
+        // Ensure all required DOM elements exist before scripts execute
+        (function() {
+            let isEnsuring = false;
+            
+            window.ensureElements = function ensureElements() {
+                if (isEnsuring) return;
+                isEnsuring = true;
+                
+                try {
+                    // Ensure loader exists
+                    if (!document.getElementById('loader')) {
+                        const loader = document.createElement('div');
+                        loader.id = 'loader';
+                        loader.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>';
+                        loader.style.display = 'none';
+                        document.body.appendChild(loader);
+                    }
+                    
+                    // Horizontal menu should already exist in HTML, but check anyway
+                    if (!document.querySelector('.horizontal-menu')) {
+                        const headerContainer = document.querySelector('.main-header-container');
+                        if (headerContainer) {
+                            const headerCenter = document.createElement('div');
+                            headerCenter.className = 'main-header-center d-none d-lg-block';
+                            headerCenter.style.display = 'none';
+                            const horizontalMenu = document.createElement('nav');
+                            horizontalMenu.className = 'horizontal-menu';
+                            const ul = document.createElement('ul');
+                            ul.className = 'horizontal-list';
+                            horizontalMenu.appendChild(ul);
+                            headerCenter.appendChild(horizontalMenu);
+                            headerContainer.appendChild(headerCenter);
+                        }
+                    }
+                    
+                    // Ensure switcher-canvas exists
+                    if (!document.getElementById('switcher-canvas')) {
+                        const switcher = document.createElement('div');
+                        switcher.className = 'offcanvas offcanvas-end';
+                        switcher.id = 'switcher-canvas';
+                        switcher.setAttribute('tabindex', '-1');
+                        switcher.setAttribute('aria-labelledby', 'offcanvasRightLabel');
+                        switcher.innerHTML = '<div class="offcanvas-header border-bottom"><h5 class="offcanvas-title text-default" id="offcanvasRightLabel">Switcher</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button></div><div class="offcanvas-body"></div>';
+                        document.body.appendChild(switcher);
+                    }
+                    
+                    // Ensure header-sidebar exists
+                    if (!document.getElementById('header-sidebar')) {
+                        const headerSidebar = document.createElement('div');
+                        headerSidebar.className = 'offcanvas offcanvas-end';
+                        headerSidebar.id = 'header-sidebar';
+                        headerSidebar.setAttribute('tabindex', '-1');
+                        headerSidebar.setAttribute('aria-labelledby', 'sidebarLabel');
+                        headerSidebar.innerHTML = '<div class="offcanvas-header rounded-0"><h5 class="fs-14 text-uppercase mb-0 fw-semibold" id="sidebarLabel">Меню</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button></div><div class="offcanvas-body rounded-0 p-0"></div>';
+                        document.body.appendChild(headerSidebar);
+                    }
+                    
+                    // Ensure scrollToTop exists
+                    if (!document.querySelector('.scrollToTop')) {
+                        const scrollToTop = document.createElement('div');
+                        scrollToTop.className = 'scrollToTop';
+                        scrollToTop.innerHTML = '<span class="arrow"><i class="las la-angle-double-up"></i></span>';
+                        document.body.appendChild(scrollToTop);
+                    }
+                    
+                    // Ensure responsive-overlay exists
+                    if (!document.getElementById('responsive-overlay')) {
+                        const overlay = document.createElement('div');
+                        overlay.id = 'responsive-overlay';
+                        document.body.appendChild(overlay);
+                    }
+                    
+                    // Hide loader
+                    const loader = document.getElementById('loader');
+                    if (loader) {
+                        loader.style.display = 'none';
+                    }
+                } catch (e) {
+                    console.warn('Error in ensureElements:', e);
+                } finally {
+                    isEnsuring = false;
+                }
+            };
+            
+            // Run on DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    window.ensureElements();
+                    setTimeout(window.ensureElements, 100);
+                });
+            } else {
+                window.ensureElements();
+                setTimeout(window.ensureElements, 100);
+            }
+        })();
+    </script>
+    
+    <style>
+        /* Убеждаемся, что меню видимо */
+        .app-sidebar {
+            display: block !important;
+            visibility: visible !important;
+        }
+        .main-menu {
+            display: block !important;
+        }
+        .side-menu__item {
+            display: flex !important;
+            align-items: center !important;
+            padding: 0.75rem 1.25rem !important;
+            color: #495057 !important;
+            text-decoration: none !important;
+        }
+        .side-menu__item:hover {
+            background-color: #f8f9fa !important;
+        }
+        .side-menu__item.active {
+            background-color: #e7f1ff !important;
+            color: #0d6efd !important;
+        }
+        .side-menu__icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.75rem;
+            fill: currentColor;
+        }
+        .side-menu__label {
+            display: block !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Page Loader -->
+    <div id="loader" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+    <!-- Page Loader -->
+
+    <!-- Start Switcher -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="switcher-canvas" aria-labelledby="offcanvasRightLabel">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title text-default" id="offcanvasRightLabel">Switcher</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <p>Switcher content</p>
+        </div>
+    </div>
+    <!-- End Switcher -->
+    
+    <div class="page">
+        <!-- app-header -->
+        <header class="app-header">
+            <div class="main-header-container container-fluid">
+                <div class="header-content-left">
+                    <!-- Start::header-element -->
+                    <div class="header-element">
+                        <!-- Кнопка переключения бокового меню -->
+                        <a aria-label="Toggle Sidebar" class="sidemenu-toggle header-link animated-arrow hor-toggle horizontal-navtoggle" data-bs-toggle="sidebar" href="javascript:void(0);">
+                            <i class="header-icon fe fe-align-left"></i>
+                        </a>
+                        <!-- Horizontal Menu Container (скрыт, но нужен для скриптов) -->
+                        <div class="main-header-center d-none d-lg-block" style="display: none !important;">
+                            <nav class="horizontal-menu">
+                                <ul class="horizontal-list"></ul>
+                            </nav>
+                        </div>
+                    </div>
+                    <!-- End::header-element -->
+                    <!-- Start::header-element -->
+                    <div class="header-element">
+                        <div class="horizontal-logo">
+                            <a href="/" class="header-logo">
+                                <span class="desktop-logo">📱 WhatsApp Service</span>
+                                <span class="toggle-logo">WhatsApp</span>
+                            </a>
+                        </div>
+                    </div>
+                    <!-- End::header-element -->
+                </div>
+                <!-- End::header-content-left -->
+                <!-- Start::header-content-right -->
+                <div class="header-content-right">
+                    <!-- Start::header-element -->
+                    <div class="header-element">
+                        <span class="badge bg-success" id="serviceStatusBadge">Проверка...</span>
+                    </div>
+                    <!-- End::header-element -->
+                </div>
+                <!-- End::header-content-right -->
+            </div>
+            <!-- End::main-header-container -->
+        </header>
+        <!-- /app-header -->
+
+        <!-- Start::app-sidebar -->
+        <aside class="app-sidebar sticky" id="sidebar">
+            <!-- Start::main-sidebar-header -->
+            <div class="main-sidebar-header">
+                <a href="/" class="header-logo">
+                    <span class="desktop-logo">📱 WhatsApp</span>
+                    <span class="toggle-logo">WA</span>
+                </a>
+            </div>
+            <!-- End::main-sidebar-header -->
+            <!-- Start::main-sidebar -->
+            <div class="main-sidebar" id="sidebar-scroll">
+                <!-- Start::nav -->
+                <nav class="main-menu-container nav nav-pills flex-column sub-open">
+                    <div class="slide-left" id="slide-left">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="#7b8191" width="24" height="24" viewBox="0 0 24 24"> <path d="M13.293 6.293 7.586 12l5.707 5.707 1.414-1.414L10.414 12l4.293-4.293z"></path> </svg>
+                    </div>
+                    <ul class="main-menu" id="main-menu">
+                        <!-- Меню будет вставлено автоматически через menu.js -->
+                    </ul>
+                </nav>
+                <!-- End::nav -->
+            </div>
+            <!-- End::main-sidebar -->
+        </aside>
+        <!-- End::app-sidebar -->
+
+        <!--APP-CONTENT START-->
+        <div class="main-content app-content">
+            <div class="container-fluid">
+                <!-- Page Header -->
+                <div class="d-md-flex d-block align-items-center justify-content-between my-4 page-header-breadcrumb">
+                    <div class="my-auto">
+                        <h5 class="page-title fs-21 mb-1">Сообщения</h5>
+                        <nav>
+                            <ol class="breadcrumb mb-0">
+                                <li class="breadcrumb-item"><a href="/">Главная</a></li>
+                                <li class="breadcrumb-item active" aria-current="page">Сообщения</li>
+                            </ol>
+                        </nav>
+                    </div>
+                </div>
+                <!-- Page Header Close -->
+
+                <!-- История сообщений -->
+                <div class="row">
+                    <div class="col-xl-12">
+                        <div class="card custom-card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fe fe-message-square me-2"></i>История обработанных сообщений
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">Страница находится в разработке. Здесь будет отображаться история обработанных сообщений из WhatsApp.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End::app-content -->
+        </div>
+
+        <!-- Footer Start -->
+        <footer class="footer mt-auto py-4 bg-white">
+            <div class="container-fluid">
+                <div class="text-center">
+                    <span class="text-muted">WhatsApp Service &copy; 2025</span>
+                </div>
+            </div>
+        </footer>
+        <!-- Footer End -->
+    </div>
+
+    <!-- Scroll To Top -->
+    <div class="scrollToTop">
+        <span class="arrow"><i class="las la-angle-double-up"></i></span>
+    </div>
+    <div id="responsive-overlay"></div>
+    <!-- Scroll To Top -->
+
+    <!-- Popper JS -->
+    <script src="/bootstrap-theme/assets/libs/@popperjs/core/umd/popper.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/node-waves/waves.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/simplebar/simplebar.min.js"></script>
+    <!-- Custom JS для работы меню - загружаем после создания всех элементов -->
+    <script>
+        // Создаем все необходимые элементы перед загрузкой скриптов
+        document.addEventListener('DOMContentLoaded', function() {
+            // Убеждаемся, что все элементы созданы
+            if (typeof window.ensureElements === 'function') {
+                window.ensureElements();
+                setTimeout(window.ensureElements, 200);
+                setTimeout(window.ensureElements, 500);
+            }
+            
+            // Загружаем скрипты после создания элементов
+            setTimeout(function() {
+                const scripts = [
+                    '/bootstrap-theme/assets/js/defaultmenu.min.js',
+                    '/bootstrap-theme/assets/js/custom-switcher.min.js',
+                    '/bootstrap-theme/assets/js/custom.js'
+                ];
+                
+                scripts.forEach(function(src) {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.onerror = function() {
+                        // Тихо игнорируем ошибки загрузки
+                    };
+                    document.body.appendChild(script);
+                });
+            }, 300);
+        });
+    </script>
+</body>
+
+</html>

@@ -10,14 +10,20 @@ const CONFIG_FILE = path.join(__dirname, 'monitoring-config.json');
 // Конфигурация по умолчанию
 let monitoringConfig = {
   api: {
-    url: process.env.API_URL || 'http://localhost:8080',
+    url: process.env.API_URL || 'https://minerhive.ru',
     endpoint: process.env.API_ENDPOINT || '/api/webhook/whatsapp',
     apiKey: process.env.API_KEY || null
   },
   groups: [],
   personalChats: [],
   monitorAllGroups: false,
-  monitorAllPersonal: false
+  monitorAllPersonal: false,
+  // Опции логирования
+  logging: {
+    logReceivedMessages: true, // Логировать все полученные сообщения
+    logOllamaResponse: true, // Логировать детали обработки ответа Ollama
+    skipOwnMessages: false // Пропускать сообщения от самого себя (по умолчанию НЕТ - обрабатываем все)
+  }
 };
 
 /**
@@ -96,6 +102,25 @@ export function updateMonitoredGroups(groups, monitorAll = false) {
 export function updateMonitoredPersonalChats(chats, monitorAll = false) {
   monitoringConfig.personalChats = chats || [];
   monitoringConfig.monitorAllPersonal = monitorAll;
+  return saveConfig();
+}
+
+/**
+ * Обновляет настройки логирования
+ */
+export function updateLoggingConfig(logReceivedMessages, logOllamaResponse, skipOwnMessages) {
+  if (!monitoringConfig.logging) {
+    monitoringConfig.logging = {};
+  }
+  if (logReceivedMessages !== undefined) {
+    monitoringConfig.logging.logReceivedMessages = logReceivedMessages === true;
+  }
+  if (logOllamaResponse !== undefined) {
+    monitoringConfig.logging.logOllamaResponse = logOllamaResponse === true;
+  }
+  if (skipOwnMessages !== undefined) {
+    monitoringConfig.logging.skipOwnMessages = skipOwnMessages === true;
+  }
   return saveConfig();
 }
 

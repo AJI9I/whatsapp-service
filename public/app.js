@@ -6,32 +6,73 @@ let allPersonalChats = [];
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
-    refreshStatus();
-    refreshModelInfo();
-    loadApiConfig();
-    refreshChats();
-    loadMonitoringConfig();
-    
-    // Обновление статуса каждые 3 секунды
-    setInterval(refreshStatus, 3000);
-    
-    // Обновление логов каждые 2 секунды
-    refreshLogs();
-    setInterval(refreshLogs, 2000);
-    
-    // Отслеживание прокрутки логов
-    const logsContainer = document.getElementById('logsContainer');
-    if (logsContainer) {
-        logsContainer.addEventListener('scroll', () => {
-            isScrolledToBottom = checkIfScrolledToBottom();
-        });
+    try {
+        console.log('🚀 Инициализация главной страницы...');
+        
+        // Обновляем статус
+        refreshStatus();
+        
+        // Обновляем информацию о модели
+        refreshModelInfo();
+        
+        // Загружаем конфигурации
+        loadApiConfig();
+        loadLoggingConfig();
+        loadMonitoringConfig();
+        
+        // Загружаем чаты
+        refreshChats();
+        
+        // Обновление статуса каждые 3 секунды
+        setInterval(refreshStatus, 3000);
+        
+        // Обновление логов каждые 2 секунды (только если контейнер существует)
+        const logsContainer = document.getElementById('logsContainer');
+        if (logsContainer) {
+            refreshLogs();
+            setInterval(refreshLogs, 2000);
+        }
+        
+        // Обновление оборудования каждые 3 секунды
+        refreshProducts();
+        setInterval(refreshProducts, 3000);
+        
+        // Отслеживание прокрутки логов (если контейнер существует)
+        const logsContainerEl = document.getElementById('logsContainer');
+        if (logsContainerEl) {
+            logsContainerEl.addEventListener('scroll', () => {
+                isScrolledToBottom = checkIfScrolledToBottom();
+            });
+        }
+        
+        // Обработка формы API конфигурации
+        const apiConfigForm = document.getElementById('apiConfigForm');
+        if (apiConfigForm) {
+            apiConfigForm.addEventListener('submit', saveApiConfig);
+        } else {
+            console.warn('⚠️ Форма apiConfigForm не найдена');
+        }
+        
+        // Обработка формы настроек логирования
+        const loggingConfigForm = document.getElementById('loggingConfigForm');
+        if (loggingConfigForm) {
+            loggingConfigForm.addEventListener('submit', saveLoggingConfig);
+        } else {
+            console.warn('⚠️ Форма loggingConfigForm не найдена');
+        }
+        
+        // Обработка формы тестового сообщения
+        const testMessageForm = document.getElementById('testMessageForm');
+        if (testMessageForm) {
+            testMessageForm.addEventListener('submit', sendTestMessage);
+        } else {
+            console.warn('⚠️ Форма testMessageForm не найдена');
+        }
+        
+        console.log('✅ Инициализация главной страницы завершена');
+    } catch (error) {
+        console.error('❌ Ошибка инициализации главной страницы:', error);
     }
-    
-    // Обработка формы API конфигурации
-    document.getElementById('apiConfigForm').addEventListener('submit', saveApiConfig);
-    
-    // Обработка формы тестового сообщения
-    document.getElementById('testMessageForm').addEventListener('submit', sendTestMessage);
 });
 
 /**
@@ -186,11 +227,20 @@ async function reconnectClient() {
     }
     
     try {
+        console.log('🔄 Начало переподключения WhatsApp клиента...');
         const response = await fetch('/api/reconnect', {
             method: 'POST'
         });
         
-        if (response.ok) {
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Ответ от сервера:', data);
+        
+        if (data.success) {
             showToast('Клиент переподключается...', 'info');
             // Обновляем статус через 2 секунды
             setTimeout(() => {
@@ -198,11 +248,12 @@ async function reconnectClient() {
                 loadQRCode();
             }, 2000);
         } else {
-            throw new Error('Ошибка переподключения');
+            throw new Error(data.error || 'Ошибка переподключения');
         }
     } catch (error) {
-        console.error('Ошибка переподключения:', error);
-        showToast('Ошибка переподключения клиента', 'danger');
+        console.error('❌ Ошибка переподключения:', error);
+        const errorMessage = error.message || 'Неизвестная ошибка';
+        showToast(`Ошибка переподключения: ${errorMessage}`, 'danger');
     }
 }
 
@@ -277,16 +328,53 @@ async function loadQRCode() {
  */
 async function refreshChats() {
     try {
+        console.log('🔄 Обновление списка чатов...');
         const response = await fetch('/api/chats');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        console.log('📋 Данные чатов получены:', {
+            groups: data.groups?.length || 0,
+            personalChats: data.personalChats?.length || 0,
+            status: data.status,
+            error: data.error
+        });
+        
+        // Проверяем наличие ошибки
+        if (data.error) {
+            console.warn('⚠️ Ошибка от API:', data.error);
+            const groupsList = document.getElementById('groupsList');
+            const personalList = document.getElementById('personalChatsList');
+            if (groupsList) {
+                groupsList.innerHTML = `<div class="alert alert-warning">${escapeHtml(data.error)}</div>`;
+            }
+            if (personalList) {
+                personalList.innerHTML = `<div class="alert alert-warning">${escapeHtml(data.error)}</div>`;
+            }
+            return;
+        }
         
         allGroups = data.groups || [];
         allPersonalChats = data.personalChats || [];
         
         renderChats();
+        console.log('✅ Список чатов обновлен');
     } catch (error) {
-        console.error('Ошибка получения списка чатов:', error);
-        showToast('Ошибка получения списка чатов', 'danger');
+        console.error('❌ Ошибка получения списка чатов:', error);
+        const groupsList = document.getElementById('groupsList');
+        const personalList = document.getElementById('personalChatsList');
+        if (groupsList) {
+            groupsList.innerHTML = `<div class="alert alert-danger">Ошибка загрузки: ${escapeHtml(error.message)}</div>`;
+        }
+        if (personalList) {
+            personalList.innerHTML = `<div class="alert alert-danger">Ошибка загрузки: ${escapeHtml(error.message)}</div>`;
+        }
+        if (typeof showToast === 'function') {
+            showToast('Ошибка получения списка чатов', 'danger');
+        }
     }
 }
 
@@ -294,37 +382,50 @@ async function refreshChats() {
  * Отобразить списки чатов
  */
 function renderChats() {
-    // Рендерим группы
-    const groupsList = document.getElementById('groupsList');
-    if (allGroups.length === 0) {
-        groupsList.innerHTML = '<div class="text-center text-muted">Группы не найдены</div>';
-    } else {
-        groupsList.innerHTML = allGroups.map(group => `
-            <div class="chat-item p-2 mb-2 border rounded ${selectedGroups.includes(group.id) ? 'selected' : ''}" 
-                 onclick="toggleGroup('${group.id}')">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${escapeHtml(group.name)}</strong>
-                        ${group.unreadCount > 0 ? `<span class="badge bg-danger ms-2">${group.unreadCount}</span>` : ''}
+    try {
+        console.log('📋 Отображение чатов...', { groups: allGroups.length, personal: allPersonalChats.length });
+        
+        // Рендерим группы
+        const groupsList = document.getElementById('groupsList');
+        if (!groupsList) {
+            console.warn('⚠️ Элемент groupsList не найден');
+            return;
+        }
+        
+        if (allGroups.length === 0) {
+            groupsList.innerHTML = '<div class="text-center text-muted">Группы не найдены</div>';
+        } else {
+            groupsList.innerHTML = allGroups.map(group => `
+                <div class="chat-item p-2 mb-2 border rounded ${selectedGroups.includes(group.id) ? 'selected' : ''}" 
+                     onclick="toggleGroup('${escapeHtml(group.id)}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${escapeHtml(group.name)}</strong>
+                            ${group.unreadCount > 0 ? `<span class="badge bg-danger ms-2">${group.unreadCount}</span>` : ''}
+                        </div>
+                        <i class="bi bi-check-circle-fill text-success ${selectedGroups.includes(group.id) ? '' : 'd-none'}" 
+                           id="group-check-${escapeHtml(group.id)}"></i>
                     </div>
-                    <i class="bi bi-check-circle-fill text-success ${selectedGroups.includes(group.id) ? '' : 'd-none'}" 
-                       id="group-check-${group.id}"></i>
                 </div>
-            </div>
-        `).join('');
-    }
-    
-    // Рендерим личные чаты
-    const personalList = document.getElementById('personalChatsList');
-    if (allPersonalChats.length === 0) {
-        personalList.innerHTML = '<div class="text-center text-muted">Личные чаты не найдены</div>';
-    } else {
-        personalList.innerHTML = allPersonalChats.map(chat => `
-            <div class="chat-item p-2 mb-2 border rounded ${selectedPersonalChats.includes(chat.id) ? 'selected' : ''}" 
-                 onclick="togglePersonal('${chat.id}')">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${escapeHtml(chat.name)}</strong>
+            `).join('');
+        }
+        
+        // Рендерим личные чаты
+        const personalList = document.getElementById('personalChatsList');
+        if (!personalList) {
+            console.warn('⚠️ Элемент personalChatsList не найден');
+            return;
+        }
+        
+        if (allPersonalChats.length === 0) {
+            personalList.innerHTML = '<div class="text-center text-muted">Личные чаты не найдены</div>';
+        } else {
+            personalList.innerHTML = allPersonalChats.map(chat => `
+                <div class="chat-item p-2 mb-2 border rounded ${selectedPersonalChats.includes(chat.id) ? 'selected' : ''}" 
+                     onclick="togglePersonal('${escapeHtml(chat.id)}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${escapeHtml(chat.name)}</strong>
                         ${chat.unreadCount > 0 ? `<span class="badge bg-danger ms-2">${chat.unreadCount}</span>` : ''}
                     </div>
                     <i class="bi bi-check-circle-fill text-success ${selectedPersonalChats.includes(chat.id) ? '' : 'd-none'}" 
@@ -374,6 +475,53 @@ async function loadApiConfig() {
         document.getElementById('apiKey').value = data.api.apiKey || '';
     } catch (error) {
         console.error('Ошибка загрузки конфигурации API:', error);
+    }
+}
+
+/**
+ * Загрузить настройки логирования
+ */
+async function loadLoggingConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        
+        const logging = data.logging || {};
+        document.getElementById('logReceivedMessages').checked = logging.logReceivedMessages !== false; // По умолчанию true
+        document.getElementById('logOllamaResponse').checked = logging.logOllamaResponse !== false; // По умолчанию true
+        document.getElementById('skipOwnMessages').checked = logging.skipOwnMessages === true; // По умолчанию false
+    } catch (error) {
+        console.error('Ошибка загрузки настроек логирования:', error);
+    }
+}
+
+/**
+ * Сохранить настройки логирования
+ */
+async function saveLoggingConfig(event) {
+    event.preventDefault();
+    
+    const logReceivedMessages = document.getElementById('logReceivedMessages').checked;
+    const logOllamaResponse = document.getElementById('logOllamaResponse').checked;
+    const skipOwnMessages = document.getElementById('skipOwnMessages').checked;
+    
+    try {
+        const response = await fetch('/api/config/logging', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ logReceivedMessages, logOllamaResponse, skipOwnMessages })
+        });
+        
+        if (response.ok) {
+            showToast('Настройки логирования сохранены', 'success');
+        } else {
+            throw new Error('Ошибка сохранения');
+        }
+    } catch (error) {
+        console.error('Ошибка сохранения настроек логирования:', error);
+        showToast('Ошибка сохранения настроек логирования', 'danger');
     }
 }
 
@@ -488,28 +636,48 @@ async function savePersonalConfig() {
  * Показать toast уведомление
  */
 function showToast(message, type = 'info') {
-    const toastContainer = document.querySelector('.toast-container');
-    const toastId = 'toast-' + Date.now();
-    
-    const toast = document.createElement('div');
-    toast.className = `toast align-items-center text-white bg-${type} border-0`;
-    toast.id = toastId;
-    toast.setAttribute('role', 'alert');
-    toast.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">${escapeHtml(message)}</div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-    `;
-    
-    toastContainer.appendChild(toast);
-    const bsToast = new bootstrap.Toast(toast);
-    bsToast.show();
-    
-    // Удалить toast после скрытия
-    toast.addEventListener('hidden.bs.toast', () => {
-        toast.remove();
-    });
+    try {
+        // Ищем или создаем контейнер для toast
+        let toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) {
+            // Создаем контейнер, если его нет
+            toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+            toastContainer.style.zIndex = '9999';
+            document.body.appendChild(toastContainer);
+            console.log('✅ Создан контейнер для toast уведомлений');
+        }
+        
+        const toastId = 'toast-' + Date.now();
+        
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white bg-${type} border-0`;
+        toast.id = toastId;
+        toast.setAttribute('role', 'alert');
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${escapeHtml(message)}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        
+        toastContainer.appendChild(toast);
+        
+        const bsToast = new bootstrap.Toast(toast, {
+            autohide: true,
+            delay: 3000
+        });
+        
+        bsToast.show();
+        
+        toast.addEventListener('hidden.bs.toast', () => {
+            toast.remove();
+        });
+    } catch (error) {
+        console.error('❌ Ошибка показа toast уведомления:', error);
+        // Fallback: показываем alert, если toast не работает
+        alert(message);
+    }
 }
 
 /**
@@ -543,10 +711,23 @@ function checkIfScrolledToBottom() {
 async function refreshLogs() {
     try {
         const response = await fetch('/api/logs?limit=200');
+        
+        if (!response.ok) {
+            console.error('Ошибка получения логов:', response.status, response.statusText);
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                logsContainer.innerHTML = `<div class="text-center text-danger p-3">Ошибка загрузки логов: ${response.status} ${response.statusText}</div>`;
+            }
+            return;
+        }
+        
         const data = await response.json();
         
         const logsContainer = document.getElementById('logsContainer');
-        if (!logsContainer) return;
+        if (!logsContainer) {
+            console.error('Контейнер логов не найден');
+            return;
+        }
         
         // Проверяем, был ли пользователь внизу до обновления
         isScrolledToBottom = checkIfScrolledToBottom();
@@ -557,29 +738,37 @@ async function refreshLogs() {
         
         if (data.logs && data.logs.length > 0) {
             logsContainer.innerHTML = data.logs.map(log => {
-                const levelClass = `log-level-${log.level.toLowerCase()}`;
+                const levelClass = `log-level-${(log.level || 'INFO').toLowerCase()}`;
+                const timestamp = log.timestamp || new Date().toISOString();
+                const level = log.level || 'INFO';
+                const message = log.message || '';
+                
                 let logHtml = `
                     <div class="log-entry">
-                        <span class="log-timestamp">${escapeHtml(log.timestamp)}</span>
-                        <span class="${levelClass}">[${escapeHtml(log.level)}]</span>
-                        <span class="log-message">${escapeHtml(log.message)}</span>
+                        <span class="log-timestamp">${escapeHtml(timestamp)}</span>
+                        <span class="${levelClass}">[${escapeHtml(level)}]</span>
+                        <span class="log-message">${escapeHtml(message)}</span>
                 `;
                 
                 // Если есть дополнительные данные (JSON), показываем их
-                if (log.data) {
+                if (log.data && log.data !== null) {
                     try {
                         // Если есть поле json, используем его, иначе пытаемся сериализовать data
                         let jsonStr = '';
-                        if (log.data.json) {
+                        if (typeof log.data === 'string') {
+                            jsonStr = log.data;
+                        } else if (log.data.json) {
                             jsonStr = log.data.json;
                         } else if (log.data.jsonData) {
                             jsonStr = log.data.jsonData;
                         } else {
                             // Пытаемся найти JSON в данных
                             const dataStr = JSON.stringify(log.data, null, 2);
-                            jsonStr = dataStr;
+                            jsonStr = dataStr !== '{}' ? dataStr : '';
                         }
-                        logHtml += `<div class="log-data">${escapeHtml(jsonStr)}</div>`;
+                        if (jsonStr) {
+                            logHtml += `<div class="log-data">${escapeHtml(jsonStr)}</div>`;
+                        }
                     } catch (e) {
                         logHtml += `<div class="log-data">${escapeHtml(String(log.data))}</div>`;
                     }
@@ -595,10 +784,14 @@ async function refreshLogs() {
                 logsContainer.scrollTop = logsContainer.scrollHeight;
             }
         } else {
-            logsContainer.innerHTML = '<div class="text-center text-muted p-3">Логов пока нет</div>';
+            logsContainer.innerHTML = '<div class="text-center text-muted p-3">Логов пока нет. Логи появятся здесь после запуска приложения.</div>';
         }
     } catch (error) {
         console.error('Ошибка получения логов:', error);
+        const logsContainer = document.getElementById('logsContainer');
+        if (logsContainer) {
+            logsContainer.innerHTML = `<div class="text-center text-danger p-3">Ошибка получения логов: ${error.message}</div>`;
+        }
     }
 }
 
@@ -626,5 +819,105 @@ async function clearLogs() {
     } catch (error) {
         console.error('Ошибка очистки логов:', error);
         showToast('Ошибка очистки логов', 'danger');
+    }
+}
+
+/**
+ * Обновить список оборудования
+ */
+async function refreshProducts() {
+    try {
+        console.debug('🔄 Обновление списка оборудования...');
+        const response = await fetch('/api/products');
+        
+        if (!response.ok) {
+            console.error('❌ Ошибка получения оборудования:', response.status, response.statusText);
+            const tableBody = document.getElementById('productsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger p-3">Ошибка загрузки: ${response.status}</td></tr>`;
+            }
+            return;
+        }
+        
+        const data = await response.json();
+        console.debug(`📦 Получено ${data.count || 0} товаров от API`, data);
+        
+        const tableBody = document.getElementById('productsTableBody');
+        const productsCount = document.getElementById('productsCount');
+        
+        if (!tableBody) {
+            console.warn('⚠️  Элемент productsTableBody не найден в DOM');
+            return;
+        }
+        
+        // Обновляем счетчик
+        if (productsCount) {
+            productsCount.textContent = data.count || 0;
+        }
+        
+        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+            console.debug(`✅ Отображение ${data.products.length} товаров в таблице`);
+            
+            // Сортируем по timestamp (последние первыми) на случай, если API не вернул в правильном порядке
+            const sortedProducts = [...data.products].sort((a, b) => {
+                const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+                const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+                return timeB - timeA; // Последние первыми
+            });
+            
+            tableBody.innerHTML = sortedProducts.map(product => {
+                const price = product.price 
+                    ? `${product.price} ${product.currency || ''}`.trim()
+                    : 'Не указана';
+                const time = product.timestamp 
+                    ? new Date(product.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    : '';
+                
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(product.model || 'Не указана')}</strong></td>
+                        <td>${escapeHtml(product.manufacturer || 'Не указан')}</td>
+                        <td><code>${escapeHtml(product.hashrate || 'Не указан')}</code></td>
+                        <td>${escapeHtml(price)}</td>
+                        <td>${escapeHtml(product.location || 'Не указана')}</td>
+                        <td class="text-muted small">${escapeHtml(time)}</td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            console.debug('ℹ️  Товаров нет, отображаем сообщение "не найдено"');
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted p-3">Оборудование не найдено</td></tr>';
+        }
+    } catch (error) {
+        console.error('❌ Ошибка получения оборудования:', error);
+        const tableBody = document.getElementById('productsTableBody');
+        if (tableBody) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger p-3">Ошибка: ${escapeHtml(error.message || 'Неизвестная ошибка')}</td></tr>`;
+        }
+    }
+}
+
+/**
+ * Очистить список оборудования
+ */
+async function clearProducts() {
+    if (!confirm('Очистить список оборудования?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/products/clear', {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showToast('Список оборудования очищен', 'success');
+            refreshProducts();
+        } else {
+            throw new Error('Ошибка очистки');
+        }
+    } catch (error) {
+        console.error('Ошибка очистки оборудования:', error);
+        showToast('Ошибка очистки оборудования', 'danger');
     }
 }
