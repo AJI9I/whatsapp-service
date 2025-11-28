@@ -1950,6 +1950,104 @@ app.get('/api/test/message/:messageId/author-phone', async (req, res) => {
 });
 
 /**
+ * API для обработки последних сообщений из чата
+ * POST /api/chat/:chatId/process-messages?limit=N
+ */
+app.post('/api/chat/:chatId/process-messages', async (req, res) => {
+  try {
+    const client = getClient();
+    
+    if (!client) {
+      return res.status(503).json({ error: 'WhatsApp клиент не инициализирован' });
+    }
+    
+    const status = getClientStatus();
+    if (!status.isReady) {
+      return res.status(503).json({ error: `WhatsApp клиент не готов (статус: ${status.status})` });
+    }
+    
+    const chatId = req.params.chatId;
+    const limit = parseInt(req.query.limit || '3');
+    
+    logger.info(`📋 Обработка последних ${limit} сообщений из чата: ${chatId}`);
+    
+    try {
+      const chat = await client.getChatById(chatId);
+      
+      // Получаем последние сообщения
+      let messages;
+      try {
+        const fetchPromise = chat.fetchMessages({ limit: limit });
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout: получение сообщений превысило 30 секунд')), 30000)
+        );
+        
+        messages = await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (fetchError) {
+        logger.error(`❌ Ошибка получения сообщений из чата: ${fetchError.message}`);
+        throw new Error(`Не удалось получить сообщения: ${fetchError.message}`);
+      }
+      
+      if (!Array.isArray(messages)) {
+        logger.warn(`⚠️  fetchMessages вернул не массив: ${typeof messages}`);
+        messages = [];
+      }
+      
+      // Импортируем handleMessage для обработки
+      const { handleMessage } = await import('./message-handler.js');
+      
+      // Обрабатываем сообщения последовательно
+      const results = {
+        processed: messages.length,
+        successCount: 0,
+        errorCount: 0,
+        errors: []
+      };
+      
+      logger.info(`🔄 Начинаем обработку ${messages.length} сообщений...`);
+      
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        try {
+          logger.info(`📨 Обработка сообщения ${i + 1}/${messages.length}...`);
+          await handleMessage(msg);
+          results.successCount++;
+          logger.info(`✅ Сообщение ${i + 1} обработано успешно`);
+        } catch (msgError) {
+          results.errorCount++;
+          const errorMsg = `Сообщение ${i + 1}: ${msgError.message}`;
+          results.errors.push(errorMsg);
+          logger.error(`❌ Ошибка обработки сообщения ${i + 1}: ${msgError.message}`);
+        }
+      }
+      
+      logger.info(`✅ Обработка завершена: ${results.successCount} успешно, ${results.errorCount} ошибок`);
+      
+      res.json({
+        success: true,
+        chatId: chatId,
+        chatName: chat.name || 'Unknown',
+        limit: limit,
+        ...results
+      });
+    } catch (error) {
+      logger.error(`❌ Ошибка обработки сообщений: ${error.message}`);
+      if (error.stack) {
+        logger.error(`Stack trace: ${error.stack}`);
+      }
+      res.status(500).json({ 
+        success: false,
+        error: error.message,
+        errorType: error.name
+      });
+    }
+  } catch (error) {
+    logger.error(`Ошибка обработки запроса на обработку сообщений: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Webhook для получения результатов от Ollama Service
  */
 app.post('/api/webhook/ollama-result', async (req, res) => {
