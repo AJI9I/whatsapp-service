@@ -1993,6 +1993,94 @@ app.post('/api/chat/:chatId/process-messages', async (req, res) => {
         messages = [];
       }
       
+      // Логируем полученные сообщения
+      logger.info('═'.repeat(80));
+      logger.info(`📨 ПОЛУЧЕНО СООБЩЕНИЙ ИЗ ГРУППЫ: ${messages.length}`);
+      logger.info('═'.repeat(80));
+      logger.info(`📱 Группа: ${chat.name || 'Unknown'} (${chatId})`);
+      logger.info(`📊 Количество: ${messages.length} сообщений`);
+      logger.info('');
+      
+      // Извлекаем и логируем информацию о сообщениях и номерах телефонов
+      const messagesInfo = [];
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        try {
+          const msgId = msg.id?._serialized || msg.id?.user || 'unknown';
+          const msgBody = msg.body ? (msg.body.substring(0, 100) + (msg.body.length > 100 ? '...' : '')) : '(без текста)';
+          const msgFrom = msg.from || 'unknown';
+          const msgAuthor = msg.author || null;
+          
+          // Определяем chatId автора для получения номера телефона
+          let authorChatId = null;
+          let authorPhone = null;
+          
+          try {
+            if (msg.id?.participant) {
+              authorChatId = msg.author || msg.from;
+            } else {
+              authorChatId = msg.from;
+            }
+            
+            if (authorChatId) {
+              const authorChat = await client.getChatById(authorChatId);
+              authorPhone = authorChat?.id?.user || null;
+            }
+          } catch (phoneError) {
+            logger.debug(`⚠️  Не удалось получить номер для сообщения ${i + 1}: ${phoneError.message}`);
+          }
+          
+          const messageInfo = {
+            index: i + 1,
+            id: msgId,
+            body: msgBody,
+            from: msgFrom,
+            author: msgAuthor,
+            phone: authorPhone,
+            timestamp: msg.timestamp ? new Date(msg.timestamp * 1000).toISOString() : null
+          };
+          
+          messagesInfo.push(messageInfo);
+          
+          logger.info(`📨 Сообщение ${i + 1}/${messages.length}:`);
+          logger.info(`   ID: ${msgId}`);
+          logger.info(`   Текст: ${msgBody}`);
+          logger.info(`   От: ${msgFrom}`);
+          if (msgAuthor && msgAuthor !== msgFrom) {
+            logger.info(`   Автор: ${msgAuthor}`);
+          }
+          if (authorPhone) {
+            logger.info(`   📞 Номер телефона: ${authorPhone}`);
+          } else {
+            logger.info(`   📞 Номер телефона: не получен`);
+          }
+          if (messageInfo.timestamp) {
+            logger.info(`   ⏰ Время: ${messageInfo.timestamp}`);
+          }
+          logger.info('');
+        } catch (infoError) {
+          logger.warn(`⚠️  Ошибка извлечения информации о сообщении ${i + 1}: ${infoError.message}`);
+        }
+      }
+      
+      logger.info('═'.repeat(80));
+      logger.info(`📊 СВОДКА ПОЛУЧЕННЫХ СООБЩЕНИЙ:`);
+      logger.info(`   Всего сообщений: ${messages.length}`);
+      logger.info(`   С номерами телефонов: ${messagesInfo.filter(m => m.phone).length}`);
+      logger.info(`   Без номеров телефонов: ${messagesInfo.filter(m => !m.phone).length}`);
+      logger.info('');
+      logger.info(`📞 ПОЛУЧЕННЫЕ НОМЕРА ТЕЛЕФОНОВ:`);
+      const uniquePhones = [...new Set(messagesInfo.filter(m => m.phone).map(m => m.phone))];
+      uniquePhones.forEach((phone, idx) => {
+        const count = messagesInfo.filter(m => m.phone === phone).length;
+        logger.info(`   ${idx + 1}. ${phone} (${count} сообщений)`);
+      });
+      if (uniquePhones.length === 0) {
+        logger.info(`   (номера телефонов не получены)`);
+      }
+      logger.info('═'.repeat(80));
+      logger.info('');
+      
       // Импортируем handleMessage для обработки
       const { handleMessage } = await import('./message-handler.js');
       
@@ -2001,7 +2089,8 @@ app.post('/api/chat/:chatId/process-messages', async (req, res) => {
         processed: messages.length,
         successCount: 0,
         errorCount: 0,
-        errors: []
+        errors: [],
+        messagesInfo: messagesInfo
       };
       
       logger.info(`🔄 Начинаем обработку ${messages.length} сообщений...`);
