@@ -506,7 +506,8 @@ export async function handleMessage(message) {
         hasMedia: message.hasMedia || false,
         messageType: message.type,
         isForwarded: message.isForwarded || false,
-        timestamp: new Date(message.timestamp * 1000)
+        timestamp: new Date(message.timestamp * 1000),
+        promptId: taskPromptId || null // Сохраняем prompt_id из задания
       };
       
       logger.info('💾 Подготовка данных для сохранения в БД:');
@@ -515,6 +516,7 @@ export async function handleMessage(message) {
       logger.info(`   senderId: "${messageDataToSave.senderId}"`);
       logger.info(`   chatId: "${messageDataToSave.chatId}"`);
       logger.info(`   chatName: "${messageDataToSave.chatName}"`);
+      logger.info(`   promptId: ${messageDataToSave.promptId || 'null (не задан)'}`);
       logger.info(`   content length: ${messageDataToSave.content?.length || 0} символов`);
       
       logger.info('💾 Вызов messageRepository.saveMessage()...');
@@ -593,7 +595,7 @@ export async function handleMessage(message) {
             savedMessage.id,
             'sent_to_ollama',
             ollamaTaskId,
-            null // prompt_id будет сохранен в Ollama Service
+            taskPromptId || null // Сохраняем prompt_id из задания
           );
           
           logger.info(`✅ Сообщение #${savedMessage.id} отправлено в Ollama Service (Task ID: ${ollamaTaskId})`);
