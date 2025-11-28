@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr" data-nav-layout="vertical" data-theme-mode="light" data-header-styles="light" data-menu-styles="light" data-toggled="open">
+
+<head>
+    <!-- Meta Data -->
+    <meta charset="UTF-8">
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Тестирование API - WhatsApp Service</title>
+    <meta name="Description" content="Страница для тестирования WhatsApp API">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="/bootstrap-theme/assets/images/brand-logos/favicon.ico" type="image/x-icon">
+    
+    <!-- Bootstrap Css -->
+    <link id="style" href="/bootstrap-theme/assets/libs/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Style Css -->
+    <link href="/bootstrap-theme/assets/css/styles.min.css" rel="stylesheet">
+    
+    <!-- Icons Css -->
+    <link href="/bootstrap-theme/assets/css/icons.css" rel="stylesheet">
+    
+    <!-- Node Waves Css -->
+    <link href="/bootstrap-theme/assets/libs/node-waves/waves.min.css" rel="stylesheet">
+    
+    <!-- Simplebar Css -->
+    <link href="/bootstrap-theme/assets/libs/simplebar/simplebar.min.css" rel="stylesheet">
+    
+    <!-- Общее меню -->
+    <script src="/menu.js"></script>
+    
+    <!-- Компонент статуса WhatsApp -->
+    <script src="/whatsapp-status.js"></script>
+    
+    <style>
+        .response-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .history-item {
+            border-bottom: 1px solid #dee2e6;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-time {
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+        .example-btn {
+            margin: 0.25rem;
+        }
+        .operation-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loader -->
+    <div id="loader">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Page -->
+    <div class="page">
+        <!-- App Header -->
+        <div class="app-header header sticky" id="header">
+            <div class="container-fluid main-container">
+                <div class="d-flex">
+                    <a aria-label="Hide Sidebar" class="app-sidebar-toggle" onclick="if(document.body.classList.contains('sidebar-minimize')) { document.body.classList.remove('sidebar-minimize'); } else { document.body.classList.add('sidebar-minimize'); }" id="sidebar-toggle"></a>
+                    <div class="main-header-center ms-3 d-none d-md-flex">
+                    </div>
+                    <div class="d-flex order-lg-2 ms-auto header-right-icons">
+                        <div class="me-2 d-sm-inline d-none">
+                            <div id="whatsapp-status"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /App Header -->
+
+        <!-- Sidebar -->
+        <div class="sticky" id="sidebar"></div>
+        <!-- /Sidebar -->
+
+        <!-- Main Content -->
+        <div class="main-content app-content">
+            <div class="container-fluid">
+                <!-- Page Header -->
+                <div class="page-header">
+                    <h1 class="page-title">Тестирование WhatsApp API</h1>
+                    <div>
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/">Главная</a></li>
+                            <li class="breadcrumb-item active">Тестирование API</li>
+                        </ol>
+                    </div>
+                </div>
+                <!-- /Page Header -->
+
+                <!-- Row -->
+                <div class="row">
+                    <div class="col-xl-12">
+                        <!-- Статус подключения -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Статус подключения</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="connectionStatus">
+                                    <span class="badge bg-secondary">Проверка...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Отправка сообщения -->
+                        <div class="card operation-section">
+                            <div class="card-header">
+                                <h3 class="card-title">Отправка сообщения</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="sendMessageForm">
+                                    <div class="mb-3">
+                                        <label for="chatIdSelect" class="form-label">Выберите чат</label>
+                                        <select class="form-select" id="chatIdSelect" required>
+                                            <option value="">Загрузка чатов...</option>
+                                        </select>
+                                        <small class="form-text text-muted">Или введите ID чата вручную</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="chatIdInput" class="form-label">ID чата (если не выбран из списка)</label>
+                                        <input type="text" class="form-control" id="chatIdInput" placeholder="120363123456789@g.us или 5511999999999@c.us">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="messageText" class="form-label">Текст сообщения</label>
+                                        <textarea class="form-control" id="messageText" rows="4" placeholder="Введите текст сообщения..." required></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary example-btn" onclick="setExample('send-message-1')">Пример 1: Простое сообщение</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary example-btn" onclick="setExample('send-message-2')">Пример 2: Сообщение с эмодзи</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary example-btn" onclick="setExample('send-message-3')">Пример 3: Многострочное</button>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Отправить сообщение</button>
+                                </form>
+                                <div class="mt-3">
+                                    <h5>Ответ:</h5>
+                                    <div id="sendMessageResponse" class="response-container" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Получение информации о чатах -->
+                        <div class="card operation-section">
+                            <div class="card-header">
+                                <h3 class="card-title">Информация о чатах</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-primary" onclick="getChats()">Получить список чатов</button>
+                                    <button type="button" class="btn btn-secondary" onclick="clearResponse('getChatsResponse')">Очистить</button>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="chatInfoId" class="form-label">Получить информацию о конкретном чате (ID)</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="chatInfoId" placeholder="120363123456789@g.us">
+                                        <button class="btn btn-primary" type="button" onclick="getChatInfo()">Получить</button>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <h5>Ответ:</h5>
+                                    <div id="getChatsResponse" class="response-container" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Получение информации о контактах -->
+                        <div class="card operation-section">
+                            <div class="card-header">
+                                <h3 class="card-title">Информация о контактах</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-primary" onclick="getContacts()">Получить список контактов</button>
+                                    <button type="button" class="btn btn-secondary" onclick="clearResponse('getContactsResponse')">Очистить</button>
+                                </div>
+                                <div class="mt-3">
+                                    <h5>Ответ:</h5>
+                                    <div id="getContactsResponse" class="response-container" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Информация о клиенте -->
+                        <div class="card operation-section">
+                            <div class="card-header">
+                                <h3 class="card-title">Информация о клиенте</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-primary" onclick="getClientInfo()">Получить информацию о клиенте</button>
+                                    <button type="button" class="btn btn-secondary" onclick="clearResponse('getClientInfoResponse')">Очистить</button>
+                                </div>
+                                <div class="mt-3">
+                                    <h5>Ответ:</h5>
+                                    <div id="getClientInfoResponse" class="response-container" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- История запросов -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">История запросов</h3>
+                                <div class="card-options">
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="clearHistory()">Очистить историю</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="requestHistory" style="max-height: 500px; overflow-y: auto;">
+                                    <p class="text-muted">История запросов будет отображаться здесь</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- /Row -->
+            </div>
+        </div>
+        <!-- /Main Content -->
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container-fluid">
+                <div class="row align-items-center flex-row-reverse">
+                    <div class="col-md-12 col-sm-12 text-center">
+                        Copyright © 2025 <a href="#">WhatsApp Service</a>. Все права защищены.
+                    </div>
+                </div>
+            </div>
+        </footer>
+        <!-- /Footer -->
+    </div>
+    <!-- /Page -->
+
+    <!-- Back-to-top -->
+    <a href="#top" id="back-to-top"><i class="ri-arrow-up-line"></i></a>
+
+    <!-- Scripts -->
+    <script src="/bootstrap-theme/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/simplebar/simplebar.min.js"></script>
+    <script src="/bootstrap-theme/assets/libs/node-waves/waves.min.js"></script>
+    <script src="/bootstrap-theme/assets/js/sticky.js"></script>
+    <script src="/bootstrap-theme/assets/js/custom.js"></script>
+    <script src="/bootstrap-theme/assets/js/defaultmenu.min.js"></script>
+    <script src="/bootstrap-theme/assets/js/sidebar-menu.js"></script>
+    <script src="/bootstrap-theme/assets/js/custom-switcher.min.js"></script>
+
+    <!-- API Test Script -->
+    <script>
+        // История запросов
+        let requestHistory = [];
+
+        // Примеры запросов
+        const examples = {
+            'send-message-1': {
+                message: 'Привет! Это тестовое сообщение.'
+            },
+            'send-message-2': {
+                message: 'Привет! 👋 Это сообщение с эмодзи 😊'
+            },
+            'send-message-3': {
+                message: 'Многострочное сообщение:\nСтрока 1\nСтрока 2\nСтрока 3'
+            }
+        };
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Инициализация страницы тестирования API...');
+            
+            // Проверяем статус подключения
+            checkConnectionStatus();
+            setInterval(checkConnectionStatus, 5000);
+            
+            // Загружаем список чатов
+            loadChats();
+            
+            // Обработка формы отправки сообщения
+            const sendMessageForm = document.getElementById('sendMessageForm');
+            if (sendMessageForm) {
+                sendMessageForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await sendMessage();
+                });
+            }
+        });
+
+        // Проверка статуса подключения
+        async function checkConnectionStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                const statusEl = document.getElementById('connectionStatus');
+                if (statusEl) {
+                    if (data.isReady) {
+                        statusEl.innerHTML = '<span class="badge bg-success">Подключено и готово</span>';
+                    } else if (data.status === 'connecting') {
+                        statusEl.innerHTML = '<span class="badge bg-warning">Подключение...</span>';
+                    } else {
+                        statusEl.innerHTML = `<span class="badge bg-danger">Не подключено (${data.status})</span>`;
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка проверки статуса:', error);
+                const statusEl = document.getElementById('connectionStatus');
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="badge bg-danger">Ошибка проверки статуса</span>';
+                }
+            }
+        }
+
+        // Загрузка списка чатов
+        async function loadChats() {
+            try {
+                const response = await fetch('/api/chats');
+                const data = await response.json();
+                
+                const select = document.getElementById('chatIdSelect');
+                if (select) {
+                    select.innerHTML = '<option value="">Выберите чат...</option>';
+                    
+                    // Добавляем группы
+                    if (data.groups && data.groups.length > 0) {
+                        const groupOpt = document.createElement('optgroup');
+                        groupOpt.label = 'Группы';
+                        data.groups.forEach(group => {
+                            const option = document.createElement('option');
+                            option.value = group.id;
+                            option.textContent = `[Группа] ${group.name}`;
+                            groupOpt.appendChild(option);
+                        });
+                        select.appendChild(groupOpt);
+                    }
+                    
+                    // Добавляем личные чаты
+                    if (data.personalChats && data.personalChats.length > 0) {
+                        const personalOpt = document.createElement('optgroup');
+                        personalOpt.label = 'Личные чаты';
+                        data.personalChats.forEach(chat => {
+                            const option = document.createElement('option');
+                            option.value = chat.id;
+                            option.textContent = `[Личный] ${chat.name}`;
+                            personalOpt.appendChild(option);
+                        });
+                        select.appendChild(personalOpt);
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки чатов:', error);
+                const select = document.getElementById('chatIdSelect');
+                if (select) {
+                    select.innerHTML = '<option value="">Ошибка загрузки чатов</option>';
+                }
+            }
+        }
+
+        // Отправка сообщения
+        async function sendMessage() {
+            const chatIdSelect = document.getElementById('chatIdSelect');
+            const chatIdInput = document.getElementById('chatIdInput');
+            const messageText = document.getElementById('messageText');
+            const responseEl = document.getElementById('sendMessageResponse');
+            
+            const chatId = chatIdSelect?.value || chatIdInput?.value;
+            const message = messageText?.value;
+            
+            if (!chatId) {
+                alert('Необходимо указать ID чата');
+                return;
+            }
+            
+            if (!message) {
+                alert('Необходимо ввести текст сообщения');
+                return;
+            }
+            
+            try {
+                addToHistory('POST', '/api/test/send-message', { chatId, message });
+                
+                const response = await fetch('/api/test/send-message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json; charset=utf-8'
+                    },
+                    body: JSON.stringify({ chatId, message })
+                });
+                
+                const data = await response.json();
+                
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = JSON.stringify(data, null, 2);
+                }
+                
+                addToHistory('POST', '/api/test/send-message', { chatId, message }, data, response.status);
+                
+            } catch (error) {
+                console.error('Ошибка отправки сообщения:', error);
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = `Ошибка: ${error.message}`;
+                }
+                addToHistory('POST', '/api/test/send-message', { chatId, message }, { error: error.message }, 500);
+            }
+        }
+
+        // Получение списка чатов
+        async function getChats() {
+            const responseEl = document.getElementById('getChatsResponse');
+            
+            try {
+                addToHistory('GET', '/api/chats', null);
+                
+                const response = await fetch('/api/chats');
+                const data = await response.json();
+                
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = JSON.stringify(data, null, 2);
+                }
+                
+                addToHistory('GET', '/api/chats', null, data, response.status);
+                
+            } catch (error) {
+                console.error('Ошибка получения чатов:', error);
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = `Ошибка: ${error.message}`;
+                }
+                addToHistory('GET', '/api/chats', null, { error: error.message }, 500);
+            }
+        }
+
+        // Получение информации о конкретном чате
+        async function getChatInfo() {
+            const chatIdInput = document.getElementById('chatInfoId');
+            const responseEl = document.getElementById('getChatsResponse');
+            
+            const chatId = chatIdInput?.value;
+            
+            if (!chatId) {
+                alert('Необходимо указать ID чата');
+                return;
+            }
+            
+            try {
+                addToHistory('GET', `/api/test/chat/${chatId}`, null);
+                
+                const response = await fetch(`/api/test/chat/${encodeURIComponent(chatId)}`);
+                const data = await response.json();
+                
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = JSON.stringify(data, null, 2);
+                }
+                
+                addToHistory('GET', `/api/test/chat/${chatId}`, null, data, response.status);
+                
+            } catch (error) {
+                console.error('Ошибка получения информации о чате:', error);
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = `Ошибка: ${error.message}`;
+                }
+                addToHistory('GET', `/api/test/chat/${chatId}`, null, { error: error.message }, 500);
+            }
+        }
+
+        // Получение списка контактов
+        async function getContacts() {
+            const responseEl = document.getElementById('getContactsResponse');
+            
+            try {
+                addToHistory('GET', '/api/test/contacts', null);
+                
+                const response = await fetch('/api/test/contacts');
+                const data = await response.json();
+                
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = JSON.stringify(data, null, 2);
+                }
+                
+                addToHistory('GET', '/api/test/contacts', null, data, response.status);
+                
+            } catch (error) {
+                console.error('Ошибка получения контактов:', error);
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = `Ошибка: ${error.message}`;
+                }
+                addToHistory('GET', '/api/test/contacts', null, { error: error.message }, 500);
+            }
+        }
+
+        // Получение информации о клиенте
+        async function getClientInfo() {
+            const responseEl = document.getElementById('getClientInfoResponse');
+            
+            try {
+                addToHistory('GET', '/api/test/client-info', null);
+                
+                const response = await fetch('/api/test/client-info');
+                const data = await response.json();
+                
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = JSON.stringify(data, null, 2);
+                }
+                
+                addToHistory('GET', '/api/test/client-info', null, data, response.status);
+                
+            } catch (error) {
+                console.error('Ошибка получения информации о клиенте:', error);
+                if (responseEl) {
+                    responseEl.style.display = 'block';
+                    responseEl.textContent = `Ошибка: ${error.message}`;
+                }
+                addToHistory('GET', '/api/test/client-info', null, { error: error.message }, 500);
+            }
+        }
+
+        // Установка примера
+        function setExample(exampleId) {
+            const example = examples[exampleId];
+            if (example) {
+                const messageText = document.getElementById('messageText');
+                if (messageText) {
+                    messageText.value = example.message;
+                }
+            }
+        }
+
+        // Очистка ответа
+        function clearResponse(responseId) {
+            const responseEl = document.getElementById(responseId);
+            if (responseEl) {
+                responseEl.style.display = 'none';
+                responseEl.textContent = '';
+            }
+        }
+
+        // Добавление в историю
+        function addToHistory(method, url, request, response, status) {
+            const historyItem = {
+                timestamp: new Date().toISOString(),
+                method: method,
+                url: url,
+                request: request,
+                response: response,
+                status: status
+            };
+            
+            requestHistory.unshift(historyItem);
+            
+            // Ограничиваем историю 50 записями
+            if (requestHistory.length > 50) {
+                requestHistory = requestHistory.slice(0, 50);
+            }
+            
+            updateHistoryDisplay();
+        }
+
+        // Обновление отображения истории
+        function updateHistoryDisplay() {
+            const historyEl = document.getElementById('requestHistory');
+            if (!historyEl) return;
+            
+            if (requestHistory.length === 0) {
+                historyEl.innerHTML = '<p class="text-muted">История запросов будет отображаться здесь</p>';
+                return;
+            }
+            
+            let html = '';
+            requestHistory.forEach((item, index) => {
+                const time = new Date(item.timestamp).toLocaleString('ru-RU');
+                const statusClass = item.status >= 200 && item.status < 300 ? 'success' : 'danger';
+                
+                html += `
+                    <div class="history-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="badge bg-${statusClass} me-2">${item.status || 'N/A'}</span>
+                                    <strong>${item.method}</strong>
+                                    <span class="ms-2 text-muted">${item.url}</span>
+                                </div>
+                                <div class="history-time">${time}</div>
+                                ${item.request ? `<div class="mt-2"><strong>Запрос:</strong><pre class="mb-0" style="font-size: 0.75rem;">${JSON.stringify(item.request, null, 2)}</pre></div>` : ''}
+                                ${item.response ? `<div class="mt-2"><strong>Ответ:</strong><pre class="mb-0" style="font-size: 0.75rem; max-height: 200px; overflow-y: auto;">${JSON.stringify(item.response, null, 2)}</pre></div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            historyEl.innerHTML = html;
+        }
+
+        // Очистка истории
+        function clearHistory() {
+            if (confirm('Очистить историю запросов?')) {
+                requestHistory = [];
+                updateHistoryDisplay();
+            }
+        }
+    </script>
+</body>
+
+</html>
+

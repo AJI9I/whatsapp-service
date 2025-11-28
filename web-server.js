@@ -218,6 +218,28 @@ app.get('/logs', (req, res) => {
   });
 });
 
+app.get('/api-test', (req, res) => {
+  logger.info(`🎯 МАРШРУТ /api-test ВЫЗВАН!`);
+  const apiTestPath = path.join(__dirname, 'public', 'api-test.html');
+  logger.info(`📄 Запрос /api-test, отправка файла: ${apiTestPath}`);
+  
+  if (!fs.existsSync(apiTestPath)) {
+    logger.error(`❌ Файл не найден: ${apiTestPath}`);
+    return res.status(404).send(`File not found: ${apiTestPath}`);
+  }
+  
+  logger.info(`✅ Файл найден, отправляю...`);
+  res.sendFile(apiTestPath, (err) => {
+    if (err) {
+      logger.error(`❌ Error serving api-test.html: ${err.message}`);
+      logger.error(`   Path: ${apiTestPath}`);
+      res.status(500).send(`Error loading api-test page: ${err.message}`);
+    } else {
+      logger.info(`✅ api-test.html отправлен успешно`);
+    }
+  });
+});
+
 // Статические файлы после маршрутов страниц
 // ВАЖНО: маршруты страниц (/, /messages, /chats, /logs, /settings) уже обработаны выше
 // express.static будет обрабатывать только реальные файлы (CSS, JS, изображения и т.д.)
@@ -1337,6 +1359,261 @@ app.post('/api/products/clear', (req, res) => {
 });
 
 /**
+ * API для тестирования WhatsApp
+ * POST /api/test/send-message - Отправить сообщение в WhatsApp
+ */
+app.post('/api/test/send-message', async (req, res) => {
+  try {
+    const client = getClient();
+    
+    if (!client) {
+      return res.status(503).json({ error: 'WhatsApp клиент не инициализирован' });
+    }
+    
+    const status = getClientStatus();
+    if (!status.isReady) {
+      return res.status(503).json({ error: `WhatsApp клиент не готов (статус: ${status.status})` });
+    }
+    
+    const { chatId, message } = req.body;
+    
+    if (!chatId) {
+      return res.status(400).json({ error: 'Необходимо указать chatId' });
+    }
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Необходимо указать message' });
+    }
+    
+    logger.info(`📤 Тестовая отправка сообщения в WhatsApp:`);
+    logger.info(`   Chat ID: ${chatId}`);
+    logger.info(`   Message: ${message.substring(0, 100)}...`);
+    
+    try {
+      const result = await client.sendMessage(chatId, message);
+      
+      logger.info(`✅ Сообщение отправлено успешно`);
+      logger.info(`   Message ID: ${result.id._serialized}`);
+      
+      res.json({
+        success: true,
+        messageId: result.id._serialized,
+        timestamp: result.timestamp,
+        from: result.from,
+        to: result.to,
+        body: result.body,
+        raw: {
+          id: result.id,
+          timestamp: result.timestamp,
+          from: result.from,
+          to: result.to,
+          body: result.body,
+          hasMedia: result.hasMedia,
+          type: result.type
+        }
+      });
+    } catch (error) {
+      logger.error(`❌ Ошибка отправки сообщения: ${error.message}`);
+      res.status(500).json({ 
+        success: false,
+        error: error.message,
+        errorType: error.name
+      });
+    }
+  } catch (error) {
+    logger.error(`Ошибка обработки запроса на отправку сообщения: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * API для тестирования WhatsApp
+ * GET /api/test/contacts - Получить список контактов
+ */
+app.get('/api/test/contacts', async (req, res) => {
+  try {
+    const client = getClient();
+    
+    if (!client) {
+      return res.status(503).json({ error: 'WhatsApp клиент не инициализирован' });
+    }
+    
+    const status = getClientStatus();
+    if (!status.isReady) {
+      return res.status(503).json({ error: `WhatsApp клиент не готов (статус: ${status.status})` });
+    }
+    
+    logger.info(`📋 Получение списка контактов...`);
+    
+    try {
+      const contacts = await client.getContacts();
+      
+      const contactsData = contacts.map(contact => ({
+        id: contact.id?._serialized || contact.id?.user || 'unknown',
+        userId: contact.id?.user || 'unknown',
+        number: contact.number || contact.id?.user || 'unknown',
+        name: contact.name || contact.pushname || contact.number || 'Unknown',
+        pushname: contact.pushname || null,
+        isUser: contact.isUser || false,
+        isMyContact: contact.isMyContact || false,
+        isGroup: contact.isGroup || false,
+        isBusiness: contact.isBusiness || false
+      }));
+      
+      logger.info(`✅ Получено контактов: ${contactsData.length}`);
+      
+      res.json({
+        success: true,
+        contacts: contactsData,
+        count: contactsData.length
+      });
+    } catch (error) {
+      logger.error(`❌ Ошибка получения контактов: ${error.message}`);
+      res.status(500).json({ 
+        success: false,
+        error: error.message,
+        errorType: error.name
+      });
+    }
+  } catch (error) {
+    logger.error(`Ошибка обработки запроса на получение контактов: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * API для тестирования WhatsApp
+ * GET /api/test/client-info - Получить информацию о клиенте
+ */
+app.get('/api/test/client-info', async (req, res) => {
+  try {
+    const client = getClient();
+    
+    if (!client) {
+      return res.status(503).json({ error: 'WhatsApp клиент не инициализирован' });
+    }
+    
+    const status = getClientStatus();
+    if (!status.isReady) {
+      return res.status(503).json({ error: `WhatsApp клиент не готов (статус: ${status.status})` });
+    }
+    
+    logger.info(`📋 Получение информации о клиенте...`);
+    
+    try {
+      const info = client.info;
+      const state = await client.getState();
+      
+      const clientInfo = {
+        pushname: info.pushname || null,
+        wid: {
+          user: info.wid?.user || null,
+          server: info.wid?.server || null,
+          _serialized: info.wid?._serialized || null
+        },
+        platform: info.platform || null,
+        state: state,
+        status: status.status,
+        isReady: status.isReady
+      };
+      
+      logger.info(`✅ Информация о клиенте получена`);
+      
+      res.json({
+        success: true,
+        clientInfo: clientInfo
+      });
+    } catch (error) {
+      logger.error(`❌ Ошибка получения информации о клиенте: ${error.message}`);
+      res.status(500).json({ 
+        success: false,
+        error: error.message,
+        errorType: error.name
+      });
+    }
+  } catch (error) {
+    logger.error(`Ошибка обработки запроса на получение информации о клиенте: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * API для тестирования WhatsApp
+ * GET /api/test/chat/:chatId - Получить информацию о чате
+ */
+app.get('/api/test/chat/:chatId', async (req, res) => {
+  try {
+    const client = getClient();
+    
+    if (!client) {
+      return res.status(503).json({ error: 'WhatsApp клиент не инициализирован' });
+    }
+    
+    const status = getClientStatus();
+    if (!status.isReady) {
+      return res.status(503).json({ error: `WhatsApp клиент не готов (статус: ${status.status})` });
+    }
+    
+    const chatId = req.params.chatId;
+    logger.info(`📋 Получение информации о чате: ${chatId}`);
+    
+    try {
+      const chat = await client.getChatById(chatId);
+      
+      const chatInfo = {
+        id: chat.id?._serialized || chat.id?.user || 'unknown',
+        name: chat.name || 'Unknown',
+        isGroup: chat.isGroup || false,
+        isReadOnly: chat.isReadOnly || false,
+        unreadCount: chat.unreadCount || 0,
+        timestamp: chat.timestamp || null,
+        archived: chat.archived || false,
+        pinned: chat.pinned || false,
+        muted: chat.muted || null
+      };
+      
+      // Если это группа, получаем участников
+      if (chat.isGroup) {
+        try {
+          const participants = await chat.participants;
+          chatInfo.participants = participants.map(p => ({
+            id: p.id?._serialized || p.id?.user || 'unknown',
+            userId: p.id?.user || 'unknown',
+            number: p.number || p.id?.user || 'unknown',
+            name: p.name || p.pushname || p.number || 'Unknown',
+            pushname: p.pushname || null,
+            isAdmin: p.isAdmin || false,
+            isSuperAdmin: p.isSuperAdmin || false
+          }));
+          chatInfo.participantCount = chatInfo.participants.length;
+        } catch (participantsError) {
+          logger.warn(`⚠️  Ошибка получения участников: ${participantsError.message}`);
+          chatInfo.participants = [];
+          chatInfo.participantError = participantsError.message;
+        }
+      }
+      
+      logger.info(`✅ Информация о чате получена`);
+      
+      res.json({
+        success: true,
+        chat: chatInfo
+      });
+    } catch (error) {
+      logger.error(`❌ Ошибка получения информации о чате: ${error.message}`);
+      res.status(500).json({ 
+        success: false,
+        error: error.message,
+        errorType: error.name
+      });
+    }
+  } catch (error) {
+    logger.error(`Ошибка обработки запроса на получение информации о чате: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Webhook для получения результатов от Ollama Service
  */
 app.post('/api/webhook/ollama-result', async (req, res) => {
@@ -1591,6 +1868,7 @@ app.use((req, res, next) => {
       req.path === '/chats' || 
       req.path === '/settings' || 
       req.path === '/logs' ||
+      req.path === '/api-test' ||
       req.path.startsWith('/api/')) {
     return next();
   }
