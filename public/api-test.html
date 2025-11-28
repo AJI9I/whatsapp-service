@@ -276,6 +276,36 @@
                             </div>
                         </div>
 
+                        <!-- Получение номера телефона автора сообщения -->
+                        <div class="card operation-section">
+                            <div class="card-header">
+                                <h3 class="card-title">Номер телефона автора сообщения</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="authorPhoneMessageId" class="form-label">ID сообщения</label>
+                                    <div class="input-group mb-2">
+                                        <input type="text" class="form-control" id="authorPhoneMessageId" placeholder="true_120363123456789@g.us_3EB0... или выберите из последних сообщений">
+                                        <select class="form-select" id="authorPhoneMessageIdSelect" style="max-width: 200px;" onchange="document.getElementById('authorPhoneMessageId').value = this.value">
+                                            <option value="">Выберите сообщение...</option>
+                                        </select>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        Введите ID сообщения вручную или выберите из последних сообщений чата.<br>
+                                        <strong>Совет:</strong> Сначала получите последние сообщения из чата, затем выберите нужное сообщение из списка.
+                                    </small>
+                                </div>
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-primary" onclick="getAuthorPhone()">Получить номер телефона</button>
+                                    <button type="button" class="btn btn-secondary" onclick="clearResponse('getAuthorPhoneResponse')">Очистить</button>
+                                </div>
+                                <div class="mt-3">
+                                    <h5>Ответ:</h5>
+                                    <div id="getAuthorPhoneResponse" class="response-container" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Получение информации о контактах -->
                         <div class="card operation-section">
                             <div class="card-header">
@@ -745,6 +775,29 @@
                         } else {
                             responseEl.textContent = jsonString;
                         }
+                        
+                        // Заполняем выпадающий список сообщений для функции получения номера телефона
+                        if (data.success && data.messages && Array.isArray(data.messages)) {
+                            const messageSelect = document.getElementById('authorPhoneMessageIdSelect');
+                            if (messageSelect) {
+                                // Очищаем список, оставляя первый элемент
+                                messageSelect.innerHTML = '<option value="">Выберите сообщение...</option>';
+                                
+                                // Добавляем сообщения в список
+                                data.messages.forEach((msg, index) => {
+                                    const option = document.createElement('option');
+                                    const msgId = msg.id || `msg_${index}`;
+                                    const msgPreview = msg.body ? (msg.body.substring(0, 50) + (msg.body.length > 50 ? '...' : '')) : 'Сообщение без текста';
+                                    option.value = msgId;
+                                    option.textContent = `${msgId.substring(0, 30)}... - ${msgPreview}`;
+                                    messageSelect.appendChild(option);
+                                });
+                                
+                                if (data.messages.length > 0) {
+                                    console.log(`✅ Добавлено ${data.messages.length} сообщений в список для выбора`);
+                                }
+                            }
+                        }
                     } catch (serializeError) {
                         responseEl.textContent = `Ошибка отображения данных: ${serializeError.message}\n\nПопробуйте уменьшить количество сообщений или проверьте формат данных.`;
                         console.error('Ошибка сериализации:', serializeError);
@@ -771,6 +824,88 @@
                 if (button) {
                     button.disabled = false;
                     button.textContent = 'Получить сообщения';
+                }
+            }
+        }
+
+        // Получение номера телефона автора сообщения
+        async function getAuthorPhone() {
+            const messageIdInput = document.getElementById('authorPhoneMessageId');
+            const messageIdSelect = document.getElementById('authorPhoneMessageIdSelect');
+            const responseEl = document.getElementById('getAuthorPhoneResponse');
+            const button = event?.target || document.querySelector('button[onclick="getAuthorPhone()"]');
+            
+            const messageId = messageIdInput?.value || messageIdSelect?.value;
+            
+            if (!messageId) {
+                alert('Необходимо указать ID сообщения');
+                return;
+            }
+            
+            // Показываем индикатор загрузки
+            if (responseEl) {
+                responseEl.style.display = 'block';
+                responseEl.textContent = '⏳ Получение номера телефона...';
+            }
+            if (button) {
+                button.disabled = true;
+                const originalText = button.textContent;
+                button.textContent = '⏳ Загрузка...';
+            }
+            
+            try {
+                const url = `/api/test/message/${encodeURIComponent(messageId)}/author-phone`;
+                addToHistory('GET', url, { messageId });
+                
+                // Добавляем таймаут для запроса (60 секунд, так как поиск может быть долгим)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+                
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (responseEl) {
+                    try {
+                        const jsonString = JSON.stringify(data, null, 2);
+                        responseEl.textContent = jsonString;
+                        
+                        // Выделяем номер телефона, если он есть
+                        if (data.success && data.authorPhone) {
+                            responseEl.innerHTML = `<pre>${jsonString}</pre><div class="alert alert-success mt-2"><strong>Номер телефона автора:</strong> ${data.authorPhone}</div>`;
+                        }
+                    } catch (serializeError) {
+                        responseEl.textContent = `Ошибка отображения данных: ${serializeError.message}`;
+                        console.error('Ошибка сериализации:', serializeError);
+                    }
+                }
+                
+                addToHistory('GET', url, { messageId }, data, response.status);
+                
+            } catch (error) {
+                const errorInfo = handleConnectionError(error);
+                if (errorInfo.shouldLog) {
+                    console.error('Ошибка получения номера телефона автора:', error);
+                }
+                if (responseEl) {
+                    let errorMessage = errorInfo.message;
+                    if (error.name === 'AbortError') {
+                        errorMessage = 'Превышено время ожидания (60 секунд). Поиск сообщения может занять время.';
+                    }
+                    responseEl.textContent = `Ошибка: ${errorMessage}`;
+                }
+                addToHistory('GET', `/api/test/message/${messageId}/author-phone`, { messageId }, { error: errorInfo.message }, 500);
+            } finally {
+                // Восстанавливаем кнопку
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = 'Получить номер телефона';
                 }
             }
         }

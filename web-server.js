@@ -1805,6 +1805,128 @@ app.get('/api/test/chat/:chatId/messages', async (req, res) => {
 });
 
 /**
+ * API для тестирования WhatsApp
+ * GET /api/test/message/:messageId/author-phone - Получить номер телефона автора сообщения
+ */
+app.get('/api/test/message/:messageId/author-phone', async (req, res) => {
+  try {
+    const client = getClient();
+    
+    if (!client) {
+      return res.status(503).json({ error: 'WhatsApp клиент не инициализирован' });
+    }
+    
+    const status = getClientStatus();
+    if (!status.isReady) {
+      return res.status(503).json({ error: `WhatsApp клиент не готов (статус: ${status.status})` });
+    }
+    
+    const messageId = req.params.messageId;
+    logger.info(`📋 Получение номера телефона автора сообщения: ${messageId}`);
+    
+    try {
+      // Получаем сообщение по ID
+      // Формат ID может быть разным: "true_120363123456789@g.us_3EB0..." или просто ID
+      let message;
+      try {
+        // Пробуем получить сообщение через поиск по всем чатам
+        // Это может быть медленно, но это единственный способ получить сообщение по ID
+        const chats = await client.getChats();
+        
+        message = null;
+        for (const chat of chats) {
+          try {
+            const messages = await chat.fetchMessages({ limit: 100 });
+            const foundMessage = messages.find(msg => 
+              msg.id?._serialized === messageId || 
+              msg.id?.user === messageId ||
+              (msg.id?._serialized && msg.id._serialized.includes(messageId)) ||
+              (msg.id?.user && msg.id.user.includes(messageId))
+            );
+            
+            if (foundMessage) {
+              message = foundMessage;
+              break;
+            }
+          } catch (chatError) {
+            // Пропускаем чаты, где не удалось получить сообщения
+            continue;
+          }
+        }
+        
+        if (!message) {
+          throw new Error('Сообщение не найдено');
+        }
+      } catch (searchError) {
+        logger.error(`❌ Ошибка поиска сообщения: ${searchError.message}`);
+        throw new Error(`Не удалось найти сообщение: ${searchError.message}`);
+      }
+      
+      // Определяем chatId автора сообщения
+      // Если есть msg.id.participant (групповое сообщение), используем msg.author
+      // Иначе используем msg.from (личное сообщение)
+      let authorChatId;
+      if (message.id?.participant) {
+        authorChatId = message.author || message.from;
+        logger.info(`📋 Групповое сообщение, используем author: ${authorChatId}`);
+      } else {
+        authorChatId = message.from;
+        logger.info(`📋 Личное сообщение, используем from: ${authorChatId}`);
+      }
+      
+      if (!authorChatId) {
+        throw new Error('Не удалось определить ID автора сообщения');
+      }
+      
+      // Получаем чат по ID автора
+      let authorChat;
+      try {
+        authorChat = await client.getChatById(authorChatId);
+      } catch (chatError) {
+        logger.error(`❌ Ошибка получения чата автора: ${chatError.message}`);
+        throw new Error(`Не удалось получить чат автора: ${chatError.message}`);
+      }
+      
+      // Извлекаем номер телефона из chat.id.user
+      const authorPhone = authorChat.id?.user || null;
+      
+      if (!authorPhone) {
+        throw new Error('Не удалось извлечь номер телефона из чата автора');
+      }
+      
+      logger.info(`✅ Номер телефона автора получен: ${authorPhone}`);
+      
+      res.json({
+        success: true,
+        messageId: messageId,
+        authorChatId: authorChatId,
+        authorPhone: authorPhone,
+        isGroup: message.id?.participant ? true : false,
+        messageInfo: {
+          id: message.id?._serialized || message.id?.user || 'unknown',
+          from: message.from || null,
+          author: message.author || null,
+          hasParticipant: !!message.id?.participant
+        }
+      });
+    } catch (error) {
+      logger.error(`❌ Ошибка получения номера телефона автора: ${error.message}`);
+      if (error.stack) {
+        logger.error(`Stack trace: ${error.stack}`);
+      }
+      res.status(500).json({ 
+        success: false,
+        error: error.message,
+        errorType: error.name
+      });
+    }
+  } catch (error) {
+    logger.error(`Ошибка обработки запроса на получение номера телефона автора: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Webhook для получения результатов от Ollama Service
  */
 app.post('/api/webhook/ollama-result', async (req, res) => {
