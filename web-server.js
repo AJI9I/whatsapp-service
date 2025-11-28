@@ -2387,29 +2387,31 @@ app.post('/api/webhook/ollama-result', async (req, res) => {
             // Если все товары не отправлены, статус = 'failed'
             const finalStatus = totalSent > 0 ? 'processed' : 'failed';
             
-            // Получаем ID сообщения из БД для обновления
-            const messageFromDb = await messageRepository.getMessageByWhatsAppId(whatsapp_message_id);
-            if (messageFromDb) {
-              await messageRepository.updateStatus(messageFromDb.id, finalStatus);
-              logger.info(`✅ Статус сообщения #${messageFromDb.id} обновлен на '${finalStatus}'`);
-            } else {
-              logger.warn(`⚠️  Сообщение не найдено в БД для обновления статуса: ${whatsapp_message_id}`);
+            // Используем updateMessageStatus, который работает с whatsapp_message_id
+            await messageRepository.updateMessageStatus(whatsapp_message_id, finalStatus);
+            logger.info(`✅ Статус сообщения '${whatsapp_message_id}' обновлен на '${finalStatus}'`);
+            
+            if (totalSent > 0 && totalFailed > 0) {
+              logger.warn(`⚠️  Частичная отправка: ${totalSent} товаров отправлено успешно, ${totalFailed} с ошибками`);
             }
           } catch (statusError) {
             logger.error(`❌ Ошибка обновления статуса сообщения: ${statusError.message}`);
+            if (statusError.stack) {
+              logger.error(`   Стек ошибки: ${statusError.stack.substring(0, 500)}`);
+            }
           }
         } else {
           logger.info(`   ℹ️  Нет товаров для отправки в Spring Boot`);
           
-          // Если нет товаров, но парсинг успешен, обновляем статус
+          // Если нет товаров, но парсинг успешен, обновляем статус на 'processed'
           try {
-            const messageFromDb = await messageRepository.getMessageByWhatsAppId(whatsapp_message_id);
-            if (messageFromDb) {
-              await messageRepository.updateStatus(messageFromDb.id, 'processed');
-              logger.info(`✅ Статус сообщения #${messageFromDb.id} обновлен на 'processed' (нет товаров для отправки)`);
-            }
+            await messageRepository.updateMessageStatus(whatsapp_message_id, 'processed');
+            logger.info(`✅ Статус сообщения '${whatsapp_message_id}' обновлен на 'processed' (нет товаров для отправки)`);
           } catch (statusError) {
             logger.error(`❌ Ошибка обновления статуса сообщения: ${statusError.message}`);
+            if (statusError.stack) {
+              logger.error(`   Стек ошибки: ${statusError.stack.substring(0, 500)}`);
+            }
           }
         }
       } else {
