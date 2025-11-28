@@ -1896,11 +1896,34 @@ app.get('/api/test/message/:messageId/author-phone', async (req, res) => {
       
       logger.info(`✅ Номер телефона автора получен: ${authorPhone}`);
       
+      // Получаем имя автора через контакт
+      let authorName = null;
+      let authorPushname = null;
+      try {
+        const authorContact = await client.getContactById(authorChatId);
+        if (authorContact) {
+          authorName = authorContact.name || null;
+          authorPushname = authorContact.pushname || null;
+          logger.info(`✅ Имя автора получено: ${authorName || authorPushname || 'N/A'}`);
+        }
+      } catch (contactError) {
+        logger.warn(`⚠️  Не удалось получить контакт для имени: ${contactError.message}`);
+        // Пробуем альтернативный способ - из чата
+        try {
+          authorName = authorChat.name || null;
+          logger.info(`✅ Имя из чата: ${authorName || 'N/A'}`);
+        } catch (chatNameError) {
+          logger.debug(`⚠️  Не удалось получить имя из чата: ${chatNameError.message}`);
+        }
+      }
+      
       res.json({
         success: true,
         messageId: messageId,
         authorChatId: authorChatId,
         authorPhone: authorPhone,
+        authorName: authorName || authorPushname || null,
+        authorPushname: authorPushname || null,
         isGroup: message.id?.participant ? true : false,
         messageInfo: {
           id: message.id?._serialized || message.id?.user || 'unknown',

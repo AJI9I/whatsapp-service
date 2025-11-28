@@ -874,12 +874,37 @@
                 if (responseEl) {
                     try {
                         const jsonString = JSON.stringify(data, null, 2);
-                        responseEl.textContent = jsonString;
                         
-                        // Выделяем номер телефона, если он есть
-                        if (data.success && data.authorPhone) {
-                            responseEl.innerHTML = `<pre>${jsonString}</pre><div class="alert alert-success mt-2"><strong>Номер телефона автора:</strong> ${data.authorPhone}</div>`;
+                        // Формируем красивый вывод с выделением важной информации
+                        let resultHtml = `<pre>${jsonString}</pre>`;
+                        
+                        if (data.success) {
+                            let infoHtml = '<div class="alert alert-success mt-2">';
+                            infoHtml += '<h6>📋 Информация об авторе сообщения:</h6>';
+                            
+                            if (data.authorPhone) {
+                                infoHtml += `<p class="mb-1"><strong>📱 Номер телефона:</strong> ${data.authorPhone}</p>`;
+                            }
+                            
+                            if (data.authorName || data.authorPushname) {
+                                const displayName = data.authorName || data.authorPushname;
+                                infoHtml += `<p class="mb-1"><strong>👤 Имя:</strong> ${displayName}</p>`;
+                                if (data.authorName && data.authorPushname && data.authorName !== data.authorPushname) {
+                                    infoHtml += `<p class="mb-1"><strong>📛 Pushname:</strong> ${data.authorPushname}</p>`;
+                                }
+                            } else {
+                                infoHtml += `<p class="mb-1 text-muted"><em>Имя не доступно</em></p>`;
+                            }
+                            
+                            if (data.isGroup !== undefined) {
+                                infoHtml += `<p class="mb-0"><strong>💬 Тип:</strong> ${data.isGroup ? 'Групповое сообщение' : 'Личное сообщение'}</p>`;
+                            }
+                            
+                            infoHtml += '</div>';
+                            resultHtml += infoHtml;
                         }
+                        
+                        responseEl.innerHTML = resultHtml;
                     } catch (serializeError) {
                         responseEl.textContent = `Ошибка отображения данных: ${serializeError.message}`;
                         console.error('Ошибка сериализации:', serializeError);
