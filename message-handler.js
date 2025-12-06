@@ -519,6 +519,51 @@ export async function handleMessage(message) {
       logger.info(`   promptId: ${messageDataToSave.promptId || 'null (не задан)'}`);
       logger.info(`   content length: ${messageDataToSave.content?.length || 0} символов`);
       
+      // Проверка дубликатов перед сохранением
+      logger.info('🔍 Проверка дубликатов сообщения...');
+      if (messageDataToSave.senderPhoneNumber && 
+          messageDataToSave.senderPhoneNumber !== 'unknown' &&
+          messageDataToSave.content && 
+          messageDataToSave.content.trim().length > 0 &&
+          messageDataToSave.chatId) {
+        
+        try {
+          const duplicates = await messageRepository.findDuplicateMessages(
+            messageDataToSave.senderPhoneNumber,
+            messageDataToSave.content,
+            messageDataToSave.chatId,
+            messageDataToSave.timestamp
+          );
+          
+          if (duplicates.length > 0) {
+            // Найден дубликат - увеличиваем счетчик у первого найденного сообщения
+            const firstDuplicate = duplicates[0];
+            await messageRepository.incrementDuplicateCount(firstDuplicate.id);
+            
+            logger.info('═'.repeat(80));
+            logger.info('⚠️  ОБНАРУЖЕН ДУБЛИКАТ СООБЩЕНИЯ');
+            logger.info('═'.repeat(80));
+            logger.info(`   Отправитель: ${messageDataToSave.senderPhoneNumber}`);
+            logger.info(`   Чат: ${messageDataToSave.chatName} (${messageDataToSave.chatId})`);
+            logger.info(`   Найден оригинал: ID=${firstDuplicate.id}, chat="${firstDuplicate.chat_name}"`);
+            logger.info(`   Счетчик дубликатов увеличен до: ${(firstDuplicate.duplicate_count || 0) + 1}`);
+            logger.info('═'.repeat(80));
+            logger.info('⏭️  Сообщение НЕ будет сохранено в БД и НЕ будет отправлено в Ollama');
+            logger.info('═'.repeat(80));
+            
+            return; // Прерываем обработку - дубликат не сохраняем и не обрабатываем
+          } else {
+            logger.info('✅ Дубликатов не обнаружено - продолжаем обработку');
+          }
+        } catch (duplicateCheckError) {
+          logger.error(`❌ Ошибка при проверке дубликатов: ${duplicateCheckError.message}`);
+          logger.error('   Продолжаем обработку сообщения...');
+          // Продолжаем обработку даже при ошибке проверки дубликатов
+        }
+      } else {
+        logger.info('⏭️  Пропущена проверка дубликатов (недостаточно данных)');
+      }
+      
       logger.info('💾 Вызов messageRepository.saveMessage()...');
       savedMessage = await messageRepository.saveMessage(messageDataToSave);
       
@@ -578,6 +623,25 @@ export async function handleMessage(message) {
         // Отправляем в Ollama Service через HTTP API
         // Используем промпт из задания, если есть
         const promptIdToUse = taskPromptId || null;
+        
+        // Проверяем, что сообщение не пустое перед отправкой в Ollama Service
+        if (!content || typeof content !== 'string' || content.trim().length === 0) {
+          logger.warn('═'.repeat(80));
+          logger.warn('⚠️  ПУСТОЕ СООБЩЕНИЕ - НЕ ОТПРАВЛЯЕМ В OLLAMA SERVICE');
+          logger.warn('═'.repeat(80));
+          logger.warn(`   Message ID: ${savedMessage.id}`);
+          logger.warn(`   Chat: ${chatName}`);
+          logger.warn(`   Content: "${content || '(null/undefined)'}"`);
+          logger.warn(`   Content length: ${content ? content.length : 0}`);
+          logger.warn(`   Message type: ${message.type || 'unknown'}`);
+          logger.warn(`   Has media: ${message.hasMedia || false}`);
+          logger.warn('═'.repeat(80));
+          logger.warn('');
+          
+          // Обновляем статус на skipped, так как сообщение не содержит текста
+          await messageRepository.updateStatus(savedMessage.id, 'skipped');
+          return; // Прерываем обработку для пустых сообщений
+        }
         
         const result = await ollamaServiceClient.parseMessage(
           content,

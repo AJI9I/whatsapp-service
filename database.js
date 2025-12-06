@@ -137,9 +137,45 @@ export async function initSchema() {
   try {
     await query(createTablesSQL);
     logger.info('✅ Схема базы данных инициализирована (WhatsApp Service)');
+    
+    // Добавляем колонку duplicate_count, если её нет (миграция)
+    await addDuplicateCountColumn();
   } catch (error) {
     logger.error('❌ Ошибка инициализации схемы БД:', error.message);
     throw error;
+  }
+}
+
+/**
+ * Добавляет колонку duplicate_count в таблицу whatsapp_messages (миграция)
+ */
+async function addDuplicateCountColumn() {
+  const migrationSQL = `
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'whatsapp_messages' 
+        AND column_name = 'duplicate_count'
+      ) THEN
+        ALTER TABLE whatsapp_messages 
+        ADD COLUMN duplicate_count INTEGER NOT NULL DEFAULT 0;
+        
+        COMMENT ON COLUMN whatsapp_messages.duplicate_count IS 
+        'Счетчик дубликатов - количество раз, когда от этого отправителя было получено идентичное сообщение в других группах за последние 10 минут';
+        
+        RAISE NOTICE 'Колонка duplicate_count успешно добавлена в таблицу whatsapp_messages';
+      END IF;
+    END $$;
+  `;
+
+  try {
+    await query(migrationSQL);
+    logger.info('✅ Миграция: проверка колонки duplicate_count выполнена');
+  } catch (error) {
+    logger.warn('⚠️  Ошибка при добавлении колонки duplicate_count (возможно, уже существует):', error.message);
+    // Не прерываем выполнение, если колонка уже существует
   }
 }
 

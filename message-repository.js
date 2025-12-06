@@ -189,6 +189,53 @@ export class MessageRepository {
       [whatsappMessageIdOrDbId, JSON.stringify(parsedData)]
     );
   }
+
+  /**
+   * Находит дубликаты сообщений от отправителя с идентичным содержимым
+   * за последние 10 минут в других чатах (исключая текущий чат)
+   * @param {string} senderPhoneNumber - номер телефона отправителя
+   * @param {string} content - содержимое сообщения
+   * @param {string} currentChatId - ID текущего чата (будет исключен)
+   * @param {Date} currentTimestamp - время текущего сообщения
+   * @returns {Promise<Array>} массив найденных дубликатов
+   */
+  async findDuplicateMessages(senderPhoneNumber, content, currentChatId, currentTimestamp) {
+    if (!senderPhoneNumber || !content || !currentChatId || !currentTimestamp) {
+      return [];
+    }
+
+    // Вычисляем время 10 минут назад
+    const tenMinutesAgo = new Date(currentTimestamp.getTime() - 10 * 60 * 1000);
+
+    const result = await query(
+      `SELECT id, whatsapp_message_id, chat_id, chat_name, sender_phone_number, 
+              content, timestamp, duplicate_count
+       FROM whatsapp_messages
+       WHERE sender_phone_number = $1
+         AND content = $2
+         AND timestamp >= $3
+         AND chat_id != $4
+       ORDER BY timestamp DESC
+       LIMIT 10`,
+      [senderPhoneNumber, content, tenMinutesAgo, currentChatId]
+    );
+
+    return result.rows;
+  }
+
+  /**
+   * Увеличивает счетчик дубликатов у сообщения
+   * @param {number} messageId - ID сообщения в БД
+   * @returns {Promise<void>}
+   */
+  async incrementDuplicateCount(messageId) {
+    await query(
+      `UPDATE whatsapp_messages 
+       SET duplicate_count = COALESCE(duplicate_count, 0) + 1
+       WHERE id = $1`,
+      [messageId]
+    );
+  }
 }
 
 export const messageRepository = new MessageRepository();

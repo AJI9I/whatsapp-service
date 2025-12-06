@@ -45,7 +45,15 @@ export async function sendToMultipleAPIs(messageData, apiTargets) {
         headers['X-API-Key'] = apiKey;
       }
       
-      logger.info(`📤 Отправка в: ${url}`);
+      // Специальное логирование для localhost:8050
+      if (url.includes('localhost:8050')) {
+        logger.info('═'.repeat(80));
+        logger.info(`🚀 ОТПРАВКА НА ЛОКАЛЬНЫЙ СЕРВЕР (localhost:8050)`);
+        logger.info(`🚀 URL: ${url}`);
+        logger.info('═'.repeat(80));
+      } else {
+        logger.info(`📤 Отправка в: ${url}`);
+      }
       
       const response = await axios.post(url, messageData, {
         headers: headers,
@@ -55,7 +63,17 @@ export async function sendToMultipleAPIs(messageData, apiTargets) {
         maxBodyLength: Infinity
       });
       
-      logger.info(`✅ Успешно отправлено в: ${url} (статус: ${response.status})`);
+      // Специальное логирование для localhost:8050
+      if (url.includes('localhost:8050')) {
+        logger.info('═'.repeat(80));
+        logger.info(`✅✅✅ УСПЕШНО ОТПРАВЛЕНО НА ЛОКАЛЬНЫЙ СЕРВЕР (localhost:8050) ✅✅✅`);
+        logger.info(`✅ URL: ${url}`);
+        logger.info(`✅ HTTP Статус: ${response.status}`);
+        logger.info(`✅ Ответ от сервера: ${JSON.stringify(response.data || {})}`);
+        logger.info('═'.repeat(80));
+      } else {
+        logger.info(`✅ Успешно отправлено в: ${url} (статус: ${response.status})`);
+      }
       
       // Логируем отправленное сообщение на бэкенд (в текстовый файл)
       logSentMessage(messageData, url, true, response.data);
@@ -65,7 +83,31 @@ export async function sendToMultipleAPIs(messageData, apiTargets) {
       const errorMessage = error.response 
         ? `HTTP ${error.response.status}: ${error.message}`
         : error.message;
-      logger.error(`❌ Ошибка отправки в ${url}: ${errorMessage}`);
+      
+      // Специальное логирование для localhost:8050
+      if (url.includes('localhost:8050')) {
+        logger.error('═'.repeat(80));
+        logger.error(`❌❌❌ ОШИБКА ОТПРАВКИ НА ЛОКАЛЬНЫЙ СЕРВЕР (localhost:8050) ❌❌❌`);
+        logger.error(`❌ URL: ${url}`);
+        logger.error(`❌ Ошибка: ${errorMessage}`);
+        if (error.response) {
+          logger.error(`❌ HTTP Статус: ${error.response.status}`);
+          logger.error(`❌ Ответ от сервера: ${JSON.stringify(error.response.data || {})}`);
+        } else if (error.request) {
+          logger.error(`❌ Запрос отправлен, но ответа нет. Проверьте, запущен ли Spring Boot на порту 8050`);
+        } else {
+          logger.error(`❌ Ошибка настройки запроса: ${error.message}`);
+        }
+        if (error.code) {
+          logger.error(`❌ Код ошибки: ${error.code}`);
+          if (error.code === 'ECONNREFUSED') {
+            logger.error(`❌ ВНИМАНИЕ: Соединение отклонено. Возможно, Spring Boot не запущен на порту 8050!`);
+          }
+        }
+        logger.error('═'.repeat(80));
+      } else {
+        logger.error(`❌ Ошибка отправки в ${url}: ${errorMessage}`);
+      }
       
       // Логируем ошибку отправки
       logSentMessage(messageData, url, false, null, errorMessage);

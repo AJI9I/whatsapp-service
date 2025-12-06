@@ -20,9 +20,23 @@ export class OllamaServiceClient {
    * @returns {Promise<Object>} Результат: { success, task_id, status, message }
    */
   async parseMessage(message, whatsappMessageId, promptId = null, callbackUrl = null, logResponse = false) {
+    // Определяем URL заранее, чтобы он был доступен в блоке catch
+    const url = `${this.ollamaServiceUrl}/api/parse`;
+    
+    // Проверяем, что сообщение не пустое
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      logger.error('═'.repeat(80));
+      logger.error('❌ ОШИБКА: ПУСТОЕ СООБЩЕНИЕ ДЛЯ OLLAMA SERVICE');
+      logger.error('═'.repeat(80));
+      logger.error(`   WhatsApp Message ID: ${whatsappMessageId}`);
+      logger.error(`   Message: ${message || '(null/undefined)'}`);
+      logger.error(`   Message length: ${message ? message.length : 0}`);
+      logger.error('═'.repeat(80));
+      logger.error('');
+      throw new Error('Пустое сообщение не может быть отправлено в Ollama Service');
+    }
+    
     try {
-      const url = `${this.ollamaServiceUrl}/api/parse`;
-      
       // Определяем финальный promptId
       const finalPromptId = promptId || this.defaultPromptId;
       

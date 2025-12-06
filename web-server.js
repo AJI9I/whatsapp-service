@@ -2212,24 +2212,51 @@ app.post('/api/webhook/ollama-result', async (req, res) => {
       logger.info(`✅ Данные парсинга для сообщения #${whatsapp_message_id} сохранены в БД`);
       
       // Получаем исходное сообщение из БД для формирования данных для Spring Boot
+      logger.info('═'.repeat(100));
       logger.info('📋 ПОЛУЧЕНИЕ ИСХОДНОГО СООБЩЕНИЯ ИЗ БД...');
+      logger.info('═'.repeat(100));
+      logger.info(`   whatsapp_message_id для поиска: ${whatsapp_message_id}`);
+      logger.info(`   Тип whatsapp_message_id: ${typeof whatsapp_message_id}`);
+      logger.info(`   whatsapp_message_id - число?: ${!isNaN(whatsapp_message_id) && !isNaN(parseInt(whatsapp_message_id))}`);
       let originalMessage = null;
       try {
-        originalMessage = await messageRepository.getMessageByWhatsAppId(whatsapp_message_id);
+        // ВАЖНО: Ollama Service передает числовой ID из БД (savedMessage.id), а не строковый whatsapp_message_id
+        // Проверяем, если это число - ищем по id, иначе по whatsapp_message_id
+        const isNumericId = !isNaN(whatsapp_message_id) && !isNaN(parseInt(whatsapp_message_id));
+        
+        if (isNumericId) {
+          logger.info(`   Поиск по числовому ID (id = ${whatsapp_message_id})`);
+          originalMessage = await messageRepository.getMessageById(parseInt(whatsapp_message_id));
+        } else {
+          logger.info(`   Поиск по строковому whatsapp_message_id (whatsapp_message_id = "${whatsapp_message_id}")`);
+          originalMessage = await messageRepository.getMessageByWhatsAppId(whatsapp_message_id);
+        }
+        
         if (originalMessage) {
           logger.info(`✅ Исходное сообщение найдено в БД:`);
+          logger.info(`   ID: ${originalMessage.id}`);
+          logger.info(`   whatsapp_message_id: ${originalMessage.whatsapp_message_id}`);
           logger.info(`   Chat ID: ${originalMessage.chat_id}`);
           logger.info(`   Chat Name: ${originalMessage.chat_name}`);
           logger.info(`   Sender ID: ${originalMessage.sender_id}`);
           logger.info(`   Sender Name: ${originalMessage.sender_name}`);
-          logger.info(`   Sender Phone: ${originalMessage.sender_phone_number}`);
+          logger.info(`   Sender Phone: "${originalMessage.sender_phone_number}"`);
+          logger.info(`   Sender Phone == null: ${originalMessage.sender_phone_number == null}`);
+          logger.info(`   Sender Phone == undefined: ${originalMessage.sender_phone_number === undefined}`);
+          logger.info(`   Sender Phone пустая строка: ${originalMessage.sender_phone_number === ''}`);
+          logger.info(`   Sender Phone == 'unknown': ${originalMessage.sender_phone_number === 'unknown'}`);
+          logger.info(`   Sender Phone тип: ${typeof originalMessage.sender_phone_number}`);
           logger.info(`   Content: ${originalMessage.content ? `${originalMessage.content.length} символов` : 'пусто'}`);
         } else {
-          logger.warn(`⚠️  Исходное сообщение не найдено в БД для whatsapp_message_id: ${whatsapp_message_id}`);
+          logger.error(`❌ Исходное сообщение НЕ НАЙДЕНО в БД!`);
+          logger.error(`   Пробовали найти по: ${isNumericId ? `id = ${whatsapp_message_id}` : `whatsapp_message_id = "${whatsapp_message_id}"`}`);
+          logger.error(`   ⚠️  Это означает, что данные о продавце (sender_phone_number) не будут получены!`);
         }
       } catch (dbError) {
         logger.error(`❌ Ошибка получения исходного сообщения из БД: ${dbError.message}`);
+        logger.error(`   Стек ошибки:`, dbError.stack);
       }
+      logger.info('═'.repeat(100));
       
       // Обрабатываем товары из parsed_data
       if (parsed_data && typeof parsed_data === 'object' && parsed_data !== null) {
@@ -2266,6 +2293,21 @@ app.post('/api/webhook/ollama-result', async (req, res) => {
             
             // Формируем данные для отправки в Spring Boot
             // Используем данные из БД, если они есть, иначе из parsed_data
+            logger.info('═'.repeat(100));
+            logger.info(`🔍 ФОРМИРОВАНИЕ ДАННЫХ ДЛЯ ОТПРАВКИ В SPRING BOOT (товар ${i + 1}):`);
+            logger.info('═'.repeat(100));
+            logger.info(`   originalMessage == null: ${originalMessage == null}`);
+            if (originalMessage) {
+              logger.info(`   originalMessage.sender_phone_number: "${originalMessage.sender_phone_number}"`);
+              logger.info(`   originalMessage.sender_phone_number тип: ${typeof originalMessage.sender_phone_number}`);
+              logger.info(`   originalMessage.sender_phone_number == null: ${originalMessage.sender_phone_number == null}`);
+              logger.info(`   originalMessage.sender_phone_number === undefined: ${originalMessage.sender_phone_number === undefined}`);
+              logger.info(`   originalMessage.sender_phone_number === '': ${originalMessage.sender_phone_number === ''}`);
+              logger.info(`   originalMessage.sender_phone_number === 'unknown': ${originalMessage.sender_phone_number === 'unknown'}`);
+            }
+            logger.info(`   parsed_data.senderPhoneNumber: "${parsed_data?.senderPhoneNumber || 'undefined/null'}"`);
+            logger.info('═'.repeat(100));
+            
             const messageData = {
               messageId: originalMessage ? `whatsapp_${originalMessage.id}_${i}` : `whatsapp_${whatsapp_message_id}_${i}`,
               chatId: originalMessage?.chat_id || parsed_data.chatId || 'unknown',
@@ -2273,7 +2315,11 @@ app.post('/api/webhook/ollama-result', async (req, res) => {
               chatType: originalMessage?.chat_type || (parsed_data.chatId?.includes('@g.us') ? 'group' : 'personal') || 'group',
               senderId: originalMessage?.sender_id || parsed_data.senderId || 'unknown',
               senderName: originalMessage?.sender_name || parsed_data.senderName || 'Unknown',
-              senderPhoneNumber: originalMessage?.sender_phone_number || parsed_data.senderPhoneNumber || 'unknown',
+              senderPhoneNumber: (originalMessage?.sender_phone_number && originalMessage.sender_phone_number !== 'unknown' && originalMessage.sender_phone_number !== '') 
+                ? originalMessage.sender_phone_number 
+                : (parsed_data?.senderPhoneNumber && parsed_data.senderPhoneNumber !== 'unknown' && parsed_data.senderPhoneNumber !== '') 
+                  ? parsed_data.senderPhoneNumber 
+                  : 'unknown',
               content: originalMessage?.content || parsed_data.originalMessage || '',
               timestamp: originalMessage?.timestamp ? new Date(originalMessage.timestamp).toISOString() : new Date().toISOString(),
               hasMedia: originalMessage?.has_media || false,
@@ -2290,19 +2336,21 @@ app.post('/api/webhook/ollama-result', async (req, res) => {
               }
             };
             
-            logger.info('═'.repeat(80));
+            logger.info('═'.repeat(100));
             logger.info(`📤 ДАННЫЕ ДЛЯ ОТПРАВКИ В SPRING BOOT (товар ${i + 1}):`);
-            logger.info('═'.repeat(80));
+            logger.info('═'.repeat(100));
             logger.info(`   messageId: ${messageData.messageId}`);
             logger.info(`   chatId: ${messageData.chatId}`);
             logger.info(`   chatName: ${messageData.chatName}`);
             logger.info(`   senderId: ${messageData.senderId}`);
             logger.info(`   senderName: ${messageData.senderName}`);
-            logger.info(`   senderPhoneNumber: ${messageData.senderPhoneNumber}`);
+            logger.info(`   ⚠️  senderPhoneNumber: "${messageData.senderPhoneNumber}"`);
+            logger.info(`   ⚠️  senderPhoneNumber == 'unknown': ${messageData.senderPhoneNumber === 'unknown'}`);
+            logger.info(`   ⚠️  senderPhoneNumber тип: ${typeof messageData.senderPhoneNumber}`);
             logger.info(`   content: ${messageData.content ? `${messageData.content.length} символов` : 'пусто'}`);
             logger.info(`   parsedData.products: ${messageData.parsedData.products.length} товар(ов)`);
             logger.info(`   Полный JSON:`, JSON.stringify(messageData, null, 2));
-            logger.info('═'.repeat(80));
+            logger.info('═'.repeat(100));
             
             // Отправляем в Spring Boot API
             try {
@@ -2312,14 +2360,19 @@ app.post('/api/webhook/ollama-result', async (req, res) => {
               const monitoringConfig = getMonitoringConfig();
               const apiConfig = monitoringConfig.api || {};
               
+              // Используем URL из конфигурации, если указан, иначе localhost:8050
+              const apiUrl = apiConfig.url || 'http://localhost:8050';
+              const remoteApiUrl = 'https://minerhive.ru';
+              
+              // Отправляем данные на оба ресурса: локальный и удаленный
               const apiTargets = [
                 {
-                  url: 'http://localhost:8050',
+                  url: apiUrl,
                   endpoint: apiConfig.endpoint || '/api/webhook/whatsapp',
                   apiKey: apiConfig.apiKey || null
                 },
                 {
-                  url: 'https://minerhive.ru',
+                  url: remoteApiUrl,
                   endpoint: apiConfig.endpoint || '/api/webhook/whatsapp',
                   apiKey: apiConfig.apiKey || null
                 }
